@@ -111,13 +111,19 @@ a:hover { color: var(--link-hover); }
 
 .sidebar {
   position: sticky;
-  top: 48px;
+  top: 40px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  align-self: start;
+  padding-top: 8px;
 }
 
-.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;   /* 收窄一点，与搜索框视觉对齐 */
+}
 .nav a {
   color: var(--text-p2);
   padding: 6px 10px;
@@ -710,8 +716,9 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   position: relative;
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 13px 18px;
+  justify-content: center;
+  gap: 12px;
+  padding: 13px 16px;
   border-radius: 13px;
   color: var(--text-p2);
   font-size: .95rem;
@@ -720,13 +727,17 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 }
 .nav-ico {
   font-size: 1rem;
-  width: 20px;
+  width: 22px;
   text-align: center;
   opacity: .55;
   transition: opacity .18s;
   flex-shrink: 0;
 }
-.nav-txt { flex: 1; }
+.nav-txt {
+  width: 3.2em;
+  flex-shrink: 0;
+  text-align: left;
+}
 .nav-item:hover { background: var(--bg-subtle); color: var(--text-p0); }
 .nav-item:hover .nav-ico { opacity: .9; }
 .nav-item.is-active {
