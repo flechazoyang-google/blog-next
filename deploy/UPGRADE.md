@@ -182,22 +182,46 @@ systemctl show blog -p MemoryCurrent | awk -F= '{printf "%d MB\n", $2/1048576}'
 
 ---
 
-## 六、为什么没做 ISR（诚实说明）
+## 六、P4 缓存：做了什么、什么没做
 
-方案里 P4 计划把 24 个 `force-dynamic` 页面改成 ISR + `revalidateTag`。实际动手后发现两个硬约束：
+### 6.1 已生效：数据层缓存
 
-1. **构建期会读库**。Next 16 在 `next build` 时就会预渲染能静态化的页面，
-   而这些页面直接读 SQLite —— 构建机上没有生产数据，会预渲染出空列表并冻进产物。
-   要正确做，必须让数据读取走 `unstable_cache` 并配合 `dynamic = 'force-dynamic'` 之外的显式策略，
-   属于一次架构改动，不适合塞在这轮里草率完成。
-2. **收益比预想小**。原 README 里"改代码不生效 → 忘了 restart"说的是**代码**变更，
-   不是内容变更；内容一直是实时读库的，发布即生效本来就是对的。
-   真实收益只是降低每请求的 SSR 开销，而实测 58MB 内存完全撑得住。
+`lib/cached.ts` 用 `unstable_cache` 包住 SQLite 读取，页面保持 `force-dynamic`。
 
-**已交付的部分**：`revalidateTag`("posts"/"post:id"/"comments") 已在所有写接口接好，
-`sitemap` 已改为 `revalidate = 3600`，Umami 耦合已解除（这项收益最大，已做）。
-真要上 ISR，现在的 tag 基础已经铺好了，是独立的一次改造。
+**为什么不做整页 ISR**：这些页面直读 SQLite，若改成 `revalidate`，
+`next build` 会在**构建机**上预渲染它们 —— 那里读的是开发库（31 篇旧文章），
+会把错误内容冻进产物。这是实测确认的，不是保守估计。
 
+**收益很小的诚实结论**：实测页面 18ms 中 SQLite 只占 **0.85ms**，
+瓶颈是 React SSR。所以这层缓存的价值是"减少 DB 压力"，不是"提速网页"。
+
+### 6.2 试过但已回滚：nginx 整页缓存
+
+实测非常有效：**19ms -> 0.6ms，约 29 倍**。安全边界也全部验证通过：
+
+| 场景 | 结果 |
+|---|---|
+| 普通首页 | MISS -> HIT -> HIT |
+| 带 Cookie | BYPASS x3（登录态不缓存） |
+| 带查询串 | BYPASS x3 |
+| /admin、/search、POST | 不缓存 |
+
+但正式上线失败：`/etc/nginx/sites-available/blog` 这个 server 块
+**没有 `listen` 指令**，靠 nginx「首个无 listen 块作为端口默认」的隐式行为工作。
+加入 `proxy_cache` 后，443 开始返回另一个 server 块的内容
+（特征是 CSP 里出现 `'unsafe-eval'`，我们的配置里没有这个值）。
+回滚后立即恢复，证明是改动引入的。
+
+**已完整回滚**，仓库里的 `deploy/nginx-blog.conf` 已还原为线上实际内容。
+未启用的附属文件放在 `deploy/pending-p4/`，附 README 说明前置条件。
+
+### 6.3 结论
+
+P4 按方案原样（整页 ISR）**没有做**，原因见 6.1；
+nginx 整页缓存**试过且有效但未启用**，原因见 6.2。
+
+若要继续，前置条件是先理清 blog 的 nginx 拓扑并补上显式 `listen`，
+详见 `deploy/pending-p4/README.md`。
 
 ---
 

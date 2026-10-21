@@ -3,8 +3,8 @@ import { PostCard } from "@/components/PostCard";
 import { Animations } from "@/components/Animations";
 import { SearchBox } from "@/components/SearchBox";
 import { RightBar } from "@/components/RightBar";
-import { listPosts, countPosts, parseJsonArray, makeExcerpt, readingTime } from "@/lib/posts";
-import { getViewsMap } from "@/lib/site-stats";
+import { parseJsonArray, makeExcerpt, readingTime } from "@/lib/posts";
+import { listPostsCached, countPostsCached, getViewsMapCached } from "@/lib/cached";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +13,9 @@ const PAGE_SIZE = 20;
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || "1", 10) || 1);
-  const posts = listPosts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
-  const viewsMap = getViewsMap();
-  const total = countPosts();
+  const posts = await listPostsCached(PAGE_SIZE, (page - 1) * PAGE_SIZE);
+  const viewsMap = new Map(await getViewsMapCached());
+  const total = await countPostsCached();
 
   return (
     <>

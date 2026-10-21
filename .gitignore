@@ -13,3 +13,5 @@ _*
 .tmp-tests/
 .probe/
 tsconfig.tsbuildinfo
+dist.tar.gz
+*.tgz

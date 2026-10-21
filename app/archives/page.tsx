@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
 import { RightBar } from "@/components/RightBar";
-import { listArchives } from "@/lib/posts";
+import { listArchivesCached } from "@/lib/cached";
 import { dateKeyIn } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +12,8 @@ export const metadata = { title: "归档" };
  * B4：原实现按年分组（published_at.slice(0,4)）却把变量命名为 ym，
  * 月度维度整体丢失。现在按 年 -> 月 两级展示，且日期按展示时区计算。
  */
-export default function ArchivesPage() {
-  const groups = listArchives();
+export default async function ArchivesPage() {
+  const groups = await listArchivesCached();
   return (
     <>
       <Animations />

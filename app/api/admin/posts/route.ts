@@ -5,7 +5,8 @@ import { requireAdmin, handle, noStore, badRequest } from "@/lib/guards";
 import { logAudit } from "@/lib/audit";
 import { oneOf, slug as vSlug, str, strList, unwrap } from "@/lib/validate";
 import { nowIso } from "@/lib/time";
-import { makeExcerpt, slugify, uniqueSlug, TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { makeExcerpt, slugify, uniqueSlug, TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export const POST = handle(async (req: NextRequest) => {
     targetType: "post", targetId: Number(info.lastInsertRowid),
     meta: { slug: finalSlug, type, status }, ip: ctx.ip, userAgent: ctx.userAgent,
   });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
+  invalidate([TAGS.posts]);
 
   return noStore(NextResponse.json({ ok: true, id: Number(info.lastInsertRowid), slug: finalSlug }));
 });

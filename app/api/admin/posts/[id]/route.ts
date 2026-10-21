@@ -5,7 +5,8 @@ import { requireAdmin, requireStepUp, stepUpCodeFrom, handle, noStore, badReques
 import { logAudit } from "@/lib/audit";
 import { oneOf, slug as vSlug, str, strList, unwrap } from "@/lib/validate";
 import { nowIso } from "@/lib/time";
-import { makeExcerpt, TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { makeExcerpt, TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -88,8 +89,7 @@ export const PATCH = handle(async (req: NextRequest, { params }: Params) => {
     meta: { slug, status, slugChanged: slug !== existing.slug },
     ip: ctx.ip, userAgent: ctx.userAgent,
   });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
-  revalidateTag(TAGS.post(id), REVALIDATE_PROFILE);
+  invalidate([TAGS.posts, TAGS.post(id)]);
 
   return noStore(NextResponse.json({ ok: true, slug, status }));
 });
@@ -107,7 +107,6 @@ export const DELETE = handle(async (req: NextRequest, { params }: Params) => {
   if (info.changes === 0) throw notFound("文章不存在或已在回收站");
 
   logAudit({ action: "post.delete", userId: ctx.user.id, userName: ctx.user.username, targetType: "post", targetId: id, ip: ctx.ip, userAgent: ctx.userAgent });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
-  revalidateTag(TAGS.post(id), REVALIDATE_PROFILE);
+  invalidate([TAGS.posts, TAGS.post(id)]);
   return noStore(NextResponse.json({ ok: true, movedToTrash: true }));
 });

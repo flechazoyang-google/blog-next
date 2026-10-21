@@ -3,7 +3,8 @@ import { revalidateTag } from "next/cache";
 import { getDb } from "@/lib/db";
 import { requireAdmin, handle, noStore, badRequest, notFound } from "@/lib/guards";
 import { logAudit, type AuditAction } from "@/lib/audit";
-import { TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export const POST = handle(async (req: NextRequest, { params }: { params: Promis
     const info = db.prepare("DELETE FROM comments WHERE id = ?").run(id);
     if (info.changes === 0) throw notFound("评论不存在");
     logAudit({ action: "comment.delete", userId: ctx.user.id, userName: ctx.user.username, targetType: "comment", targetId: id, ip: ctx.ip, userAgent: ctx.userAgent });
-    revalidateTag(TAGS.comments, REVALIDATE_PROFILE);
+  invalidate([TAGS.comments]);
     return noStore(NextResponse.json({ ok: true }));
   }
 
@@ -42,6 +43,6 @@ export const POST = handle(async (req: NextRequest, { params }: { params: Promis
   if (info.changes === 0) throw notFound("评论不存在");
 
   logAudit({ action: mapped.action, userId: ctx.user.id, userName: ctx.user.username, targetType: "comment", targetId: id, ip: ctx.ip, userAgent: ctx.userAgent });
-  revalidateTag(TAGS.comments, REVALIDATE_PROFILE);
+  invalidate([TAGS.comments]);
   return noStore(NextResponse.json({ ok: true, status: mapped.status }));
 });

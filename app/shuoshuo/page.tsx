@@ -2,14 +2,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
 import { RightBar } from "@/components/RightBar";
 import { formatDate } from "@/components/PostCard";
-import { listShuoshuo } from "@/lib/posts";
+import { listShuoshuoCached } from "@/lib/cached";
 import { renderMarkdown } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "说说" };
 
-export default function ShuoshuoPage() {
-  const items = listShuoshuo(100);
+export default async function ShuoshuoPage() {
+  const items = await listShuoshuoCached(100);
   return (
     <>
       <Animations />

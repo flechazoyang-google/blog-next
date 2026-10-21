@@ -4,7 +4,8 @@ import { requireAdmin, handle, noStore } from "@/lib/guards";
 import { getSettings, updateSettings, type Settings } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
 import { str } from "@/lib/validate";
-import { TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +45,7 @@ export const PUT = handle(async (req: NextRequest) => {
     action: "settings.update", userId: ctx.user.id, userName: ctx.user.username,
     targetType: "setting", meta: { keys: Object.keys(patch) }, ip: ctx.ip, userAgent: ctx.userAgent,
   });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
-  revalidateTag(TAGS.stats, REVALIDATE_PROFILE);
+  invalidate([TAGS.posts, TAGS.stats]);
 
   return noStore(NextResponse.json({ ok: true, settings: getSettings() }));
 });

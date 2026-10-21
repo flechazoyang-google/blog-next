@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { getSiteStats, getTagCloud } from "@/lib/site-stats";
+import { getSiteStatsCached, getTagCloudCached } from "@/lib/cached";
 
 type Toc = { level: number; text: string; id: string }[];
 
 /** 桌面端右侧栏：站点统计 + 标签云（文章页还会在上面显示目录） */
 export async function RightBar({ toc }: { toc?: Toc }) {
-  const stats = getSiteStats();
-  const tags = getTagCloud(14);
+  const stats = await getSiteStatsCached();
+  const tags = await getTagCloudCached(14);
 
   return (
     <aside className="rightbar">

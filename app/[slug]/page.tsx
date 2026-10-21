@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
 import { formatDate, toIso } from "@/components/PostCard";
-import { decodeSlug, resolveSlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt, getPageBySlug } from "@/lib/posts";
+import { decodeSlug, prevNextPost, parseJsonArray, readingTime, makeExcerpt } from "@/lib/posts";
+import { resolveSlugCached, getPageBySlugCached, getPageViewsCached, getSettingsCached } from "@/lib/cached";
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
@@ -17,8 +18,8 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const { post, redirectTo } = resolveSlug(slug);
-  const doc = post ?? getPageBySlug(slug);
+  const { post, redirectTo } = await resolveSlugCached(slug);
+  const doc = post ?? (await getPageBySlugCached(slug));
   if (!doc || redirectTo) return {};
   const desc = doc.excerpt || makeExcerpt(doc.content);
   return {
@@ -50,11 +51,11 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   //                      别名表就失去意义了
   //   permanentRedirect() -> 308 永久（等价 301 的语义，且保留请求方法）
   // 注：Server Component 里无法直接返回 301，308 是 Next 提供的最接近的永久跳转。
-  const resolved = resolveSlug(slug);
+  const resolved = await resolveSlugCached(slug);
   if (resolved.redirectTo) permanentRedirect("/" + encodeURIComponent(resolved.redirectTo));
 
   const post = resolved.post && resolved.post.type === "post" ? resolved.post : null;
-  const page = post ? null : getPageBySlug(slug);
+  const page = post ? null : await getPageBySlugCached(slug);
   const doc = post ?? page;
   if (!doc) notFound();
 
@@ -62,8 +63,8 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const cats = parseJsonArray(doc.categories);
   const tags = parseJsonArray(doc.tags);
   const nav = post ? prevNextPost(doc.published_at || doc.created_at) : {};
-  const pageViews = getPageViews("/" + decodeSlug(slug));
-  const settings = getSettings();
+  const pageViews = await getPageViewsCached("/" + decodeSlug(slug));
+  const settings = await getSettingsCached();
 
   return (
     <>

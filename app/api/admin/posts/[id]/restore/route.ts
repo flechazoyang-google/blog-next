@@ -4,7 +4,8 @@ import { getDb } from "@/lib/db";
 import { requireAdmin, requireStepUp, stepUpCodeFrom, handle, noStore, badRequest, notFound } from "@/lib/guards";
 import { logAudit } from "@/lib/audit";
 import { nowIso } from "@/lib/time";
-import { TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,7 @@ export const POST = handle(async (req: NextRequest, { params }: { params: Promis
   if (info.changes === 0) throw notFound("回收站里没有这篇文章");
 
   logAudit({ action: "post.restore", userId: ctx.user.id, userName: ctx.user.username, targetType: "post", targetId: id, ip: ctx.ip, userAgent: ctx.userAgent });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
-  revalidateTag(TAGS.post(id), REVALIDATE_PROFILE);
+  invalidate([TAGS.posts, TAGS.post(id)]);
   return noStore(NextResponse.json({ ok: true }));
 });
 
@@ -44,7 +44,6 @@ export const DELETE = handle(async (req: NextRequest, { params }: { params: Prom
     action: "post.purge", userId: ctx.user.id, userName: ctx.user.username,
     targetType: "post", targetId: id, meta: { cascadeComments: comments }, ip: ctx.ip, userAgent: ctx.userAgent,
   });
-  revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
-  revalidateTag(TAGS.post(id), REVALIDATE_PROFILE);
+  invalidate([TAGS.posts, TAGS.post(id)]);
   return noStore(NextResponse.json({ ok: true, purgedComments: comments }));
 });

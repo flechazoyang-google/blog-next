@@ -4,6 +4,7 @@ import { RightBar } from "@/components/RightBar";
 import { PostCard } from "@/components/PostCard";
 import { getDb } from "@/lib/db";
 import { makeExcerpt, parseJsonArray, decodeSlug } from "@/lib/posts";
+import { listPostsCached } from "@/lib/cached";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ tag: stri
 export default async function TagPage({ params }: { params: Promise<{ tag: string }> }) {
   const { tag: raw } = await params;
   const tag = decodeSlug(raw);
-  const db = getDb();
-
-  // tags 存的是 JSON 数组字符串，用 LIKE 粗筛后再精确过滤
-  const candidates = db.prepare(
-    "SELECT * FROM posts WHERE type='post' AND status='published' AND tags LIKE ? ORDER BY published_at DESC"
-  ).all("%" + tag + "%") as any[];
-
+  // 原先每次请求都全表 LIKE 扫描；改为复用已缓存的全量列表
+  const candidates = await listPostsCached(1000, 0);
   const posts = candidates.filter((p) => parseJsonArray(p.tags).includes(tag));
 
   return (

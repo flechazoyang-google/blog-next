@@ -4,7 +4,8 @@ import { getDb } from "@/lib/db";
 import { requireAdmin, requireStepUp, stepUpCodeFrom, handle, noStore, badRequest } from "@/lib/guards";
 import { logAudit } from "@/lib/audit";
 import { nowIso } from "@/lib/time";
-import { TAGS, REVALIDATE_PROFILE } from "@/lib/posts";
+import { TAGS } from "@/lib/posts";
+import { invalidate } from "@/lib/purge";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export const POST = handle(async (req: NextRequest) => {
     const info = db.prepare("UPDATE posts SET deleted_at = ?, updated_at = ? WHERE id IN (" + ph + ") AND deleted_at IS NULL")
       .run(nowIso(), nowIso(), ...ids);
     logAudit({ action: "post.bulk", userId: ctx.user.id, userName: ctx.user.username, meta: { action, ids, affected: info.changes }, ip: ctx.ip, userAgent: ctx.userAgent });
-    revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
+  invalidate([TAGS.posts]);
     return noStore(NextResponse.json({ ok: true, affected: info.changes }));
   }
 
@@ -38,7 +39,7 @@ export const POST = handle(async (req: NextRequest) => {
     const info = db.prepare("UPDATE posts SET deleted_at = NULL, updated_at = ? WHERE id IN (" + ph + ") AND deleted_at IS NOT NULL")
       .run(nowIso(), ...ids);
     logAudit({ action: "post.bulk", userId: ctx.user.id, userName: ctx.user.username, meta: { action, ids, affected: info.changes }, ip: ctx.ip, userAgent: ctx.userAgent });
-    revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
+  invalidate([TAGS.posts]);
     return noStore(NextResponse.json({ ok: true, affected: info.changes }));
   }
 
@@ -50,7 +51,7 @@ export const POST = handle(async (req: NextRequest) => {
       : db.prepare("UPDATE posts SET status = 'draft', updated_at = ? WHERE id IN (" + ph + ")")
           .run(nowIso(), ...ids);
     logAudit({ action: "post.bulk", userId: ctx.user.id, userName: ctx.user.username, meta: { action, ids, affected: info.changes }, ip: ctx.ip, userAgent: ctx.userAgent });
-    revalidateTag(TAGS.posts, REVALIDATE_PROFILE);
+  invalidate([TAGS.posts]);
     return noStore(NextResponse.json({ ok: true, affected: info.changes }));
   }
 

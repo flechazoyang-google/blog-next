@@ -1,0 +1,6 @@
+[Unit]
+Description=Flush blog nginx page cache
+
+[Service]
+Type=oneshot
+ExecStart=/opt/blog/scripts/purge-cache.sh

@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch purge hint and flush blog page cache
+
+[Path]
+# 应用保存内容后 touch 这个文件（应用有 /var/lib/blog 的写权限）
+PathModified=/var/lib/blog/.purge-hint
+Unit=blog-purge.service
+
+[Install]
+WantedBy=multi-user.target
