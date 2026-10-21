@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SearchBox } from "./SearchBox";
 
 const NAV = [
   { href: "/", label: "首页", icon: "🏠" },
@@ -33,19 +34,27 @@ export function MobileNav() {
       <header className="mobile-topbar">
         <Link href="/" className="mobile-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/avatar.png" alt="" width={28} height={28} onError={(e) => {
+          <img src="/avatar.jpg" alt="" width={28} height={28} onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }} />
           <span>flechazo</span>
         </Link>
-        <button
-          className="mobile-menu-btn"
-          aria-label="菜单"
-          aria-expanded={open}
-          onClick={() => setOpen(true)}
-        >
-          <span /><span /><span />
-        </button>
+        <div className="mobile-topbar-actions">
+          <button className="mobile-icon-btn" aria-label="搜索" onClick={() => setOpen(true)}>
+            <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden>
+              <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
+              <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+          <button
+            className="mobile-menu-btn"
+            aria-label="菜单"
+            aria-expanded={open}
+            onClick={() => setOpen(true)}
+          >
+            <span /><span /><span />
+          </button>
+        </div>
       </header>
 
       {open ? (
@@ -54,6 +63,9 @@ export function MobileNav() {
             <div className="mobile-drawer-head">
               <span>导航</span>
               <button aria-label="关闭" onClick={() => setOpen(false)}>×</button>
+            </div>
+            <div className="mobile-drawer-search">
+              <SearchBox />
             </div>
             {NAV.map((n) => (
               <Link

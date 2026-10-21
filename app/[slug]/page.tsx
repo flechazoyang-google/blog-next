@@ -41,14 +41,22 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <main className="content">
           <article>
             <header className="article-header">
+              {cats.length > 0 ? (
+                <div className="article-eyebrow">
+                  {cats.map((c) => (
+                    <span key={c} className="cat-pill">{c}</span>
+                  ))}
+                </div>
+              ) : null}
               <h1 className="article-title">{doc.title}</h1>
-              <div className="meta">
+              <div className="article-meta-bar">
                 <time dateTime={toIso(doc.published_at || doc.created_at)}>
                   {formatDate(doc.published_at || doc.created_at)}
                 </time>
                 <span className="dot">·</span>
-                <span>{readingTime(doc.content)} 分钟</span>
-                {cats.map((c) => <span key={c} className="cat">{c}</span>)}
+                <span>{readingTime(doc.content)} 分钟阅读</span>
+                <span className="dot">·</span>
+                <span>{doc.content.replace(/\s/g, "").length} 字</span>
               </div>
             </header>
 
