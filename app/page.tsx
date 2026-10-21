@@ -19,7 +19,6 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <div className="site-shell">
         <Sidebar active="/" />
         <main className="content">
-          <h1 className="page-title">文章</h1>
           <div className="post-list">
             {posts.length === 0 ? (
               <div className="empty">还没有文章</div>

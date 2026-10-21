@@ -472,10 +472,12 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   .site-shell {
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
-    padding: 16px 20px 72px;
+    padding: 14px 20px 72px;
     max-width: 100%;
     width: 100%;
   }
+  /* 首页不再有页面标题，列表从顶部开始，收紧首卡间距 */
+  .post-list { gap: 12px; }
   .toc-col { display: none !important; }
 
   .content { max-width: 100%; }
