@@ -27,6 +27,57 @@ async function getUmamiViews(): Promise<number | null> {
   }
 }
 
+/** 读取单篇文章的访问量；未配置时返回 null */
+export async function getPageViews(pagePath: string): Promise<number | null> {
+  const apiBase = process.env.UMAMI_API_URL;
+  const websiteId = process.env.UMAMI_WEBSITE_ID;
+  const token = process.env.UMAMI_TOKEN;
+  if (!apiBase || !websiteId || !token) return null;
+
+  try {
+    const end = Date.now();
+    const start = end - 365 * 86400000;
+    const url =
+      `${apiBase}/api/websites/${websiteId}/stats?startAt=${start}&endAt=${end}&path=${encodeURIComponent(pagePath)}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const pv = data?.pageviews;
+    const n = typeof pv === "number" ? pv : pv?.value;
+    return typeof n === "number" ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 批量获取所有路径的浏览量，返回 Map<path, views> */
+export async function getViewsMap(): Promise<Map<string, number>> {
+  const apiBase = process.env.UMAMI_API_URL;
+  const websiteId = process.env.UMAMI_WEBSITE_ID;
+  const token = process.env.UMAMI_TOKEN;
+  if (!apiBase || !websiteId || !token) return new Map();
+
+  try {
+    const end = Date.now();
+    const start = end - 365 * 86400000;
+    const res = await fetch(
+      `${apiBase}/api/websites/${websiteId}/metrics?startAt=${start}&endAt=${end}&type=path&limit=500`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    );
+    if (!res.ok) return new Map();
+    const rows = (await res.json()) as { x: string; y: number }[];
+    const map = new Map<string, number>();
+    for (const r of rows) map.set(r.x, r.y);
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 /** 站点统计（异步，以便读取 Umami） */
 export async function getSiteStats(): Promise<Stat[]> {
   const db = getDb();

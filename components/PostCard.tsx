@@ -8,9 +8,10 @@ type Props = {
   date: string;
   categories?: string[];
   readingTime?: number;
+  views?: number;
 };
 
-export function PostCard({ href, title, excerpt, date, categories = [], readingTime }: Props) {
+export function PostCard({ href, title, excerpt, date, categories = [], readingTime, views }: Props) {
   return (
     <Link href={href} className="post-card slide-up">
       <h2>{title}</h2>
@@ -18,6 +19,19 @@ export function PostCard({ href, title, excerpt, date, categories = [], readingT
       <div className="meta">
         <time dateTime={toIso(date)}>{formatDate(date)}</time>
         {readingTime ? <><span className="dot">·</span><span>{readingTime} 分钟</span></> : null}
+        {typeof views === "number" && views > 0 ? (
+          <>
+            <span className="dot">·</span>
+            <span className="views-badge">
+              <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden>
+                <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"
+                      fill="none" stroke="currentColor" strokeWidth="1.8" />
+                <circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+              </svg>
+              {views}
+            </span>
+          </>
+        ) : null}
         {categories.map((c) => {
           const col = categoryColor(c);
           return (

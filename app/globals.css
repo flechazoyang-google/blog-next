@@ -1010,3 +1010,13 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   transform: translateY(-1px);
 }
 .tag-pill:hover .tag-hash { opacity: 1; }
+
+/* ── 浏览量徽标 ── */
+.views-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-p4);
+  font-variant-numeric: tabular-nums;
+}
+.views-badge svg { opacity: .6; }

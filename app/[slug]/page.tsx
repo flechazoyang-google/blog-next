@@ -9,6 +9,7 @@ import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
 import { categoryColor } from "@/lib/category-color";
 import { RightBar } from "@/components/RightBar";
+import { getPageViews } from "@/lib/site-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const cats = parseJsonArray(doc.categories);
   const tags = parseJsonArray(doc.tags);
   const nav = post ? prevNextPost(doc.published_at || doc.created_at) : {};
+  const pageViews = await getPageViews("/" + decodeSlug(slug));
 
   return (
     <>
@@ -64,6 +66,19 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
                 <span>{readingTime(doc.content)} 分钟阅读</span>
                 <span className="dot">·</span>
                 <span>{doc.content.replace(/\s/g, "").length} 字</span>
+                {pageViews !== null ? (
+                  <>
+                    <span className="dot">·</span>
+                    <span className="views-badge">
+                      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden>
+                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"
+                              fill="none" stroke="currentColor" strokeWidth="1.8" />
+                        <circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                      </svg>
+                      {pageViews.toLocaleString()} 次浏览
+                    </span>
+                  </>
+                ) : null}
               </div>
             </header>
 
