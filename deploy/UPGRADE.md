@@ -565,3 +565,46 @@ Artalk 数据在 `/opt/artalk/data/artalk.db`（单文件 SQLite）。
 ```bash
 sqlite3 /opt/artalk/data/artalk.db ".backup '$TMP/artalk.db'"
 ```
+
+### 13.7 后续又踩的三个坑（配置类，现象都很迷惑）
+
+**① 登录后立刻掉线 —— `login_timeout` 没配**
+
+现象：`/sidebar/` 输入邮箱密码能"登录成功"，但随后所有请求仍返回
+`403 {"msg":"需要管理员权限","need_login":true}`，前端控制台刷 `GET /api/v2/sites 403`。
+
+根因：JWT 的 `exp` 与 `iat` **完全相同**（有效期 0 秒）。
+Artalk 用 `app.Conf().LoginTimeout` 作为 TTL，不配就是 0，token 签发即过期。
+解码 token 就能看出来：
+
+```bash
+curl -s -X POST https://artalk.yghsite.cn/api/v2/auth/email/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"...","password":"..."}' | node -e "..." # 取 token
+echo $TOKEN | cut -d. -f2 | base64 -d   # {"user_id":1,"exp":X,"iat":X} <- 相等就是没配
+```
+
+修复：`login_timeout: 259200`（3 天）。
+
+**② 后台报 `Email auth is not enabled`**
+
+`auth.enabled` 与 `auth.email.enabled` **默认都是 false**。不配则登录接口直接拒绝，
+前端表现为"输完密码点登录，提示无效"。
+
+**③ 游客无法评论：`anonymous user is not allowed`**
+
+`auth.anonymous` 默认 false，意味着**必须登录才能评论**。个人博客通常要改成 true，
+配合 `moderator.pending_default: true` 做"匿名可评 + 先审后发"。
+
+### 13.8 站点记录的两个坑
+
+- 站点名必须与前端 `NEXT_PUBLIC_ARTALK_SITE` **完全一致**（当前 `flechazo blog`），
+  不一致会报「未找到站点」。注意别用带撇号的 `flechazo's blog`。
+- `sites.urls` 字段必须是**字符串数组**，直接写 SQL 容易存成
+  `["[https://...]"]` 这种多一层引号的脏值。正确做法是用 API 更新：
+
+```bash
+curl -X PUT https://artalk.yghsite.cn/api/v2/sites/1 \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"name":"flechazo blog","urls":["https://blog.yghsite.cn"]}'
+```
