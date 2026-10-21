@@ -49,7 +49,8 @@
 
 html {
   font-size: var(--fs);
-  scroll-behavior: smooth;
+  /* 关闭平滑滚动：前进/后退时浏览器恢复位置会逐帧滚动，视觉上很干扰 */
+  scroll-behavior: auto;
   -webkit-text-size-adjust: 100%;
 }
 

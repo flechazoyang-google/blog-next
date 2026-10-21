@@ -44,6 +44,7 @@ copyDir(STANDALONE, OUT);
 copyDir(path.join(ROOT, ".next", "static"), path.join(OUT, ".next", "static"));
 if (fs.existsSync(path.join(ROOT, "public"))) copyDir(path.join(ROOT, "public"), path.join(OUT, "public"));
 copyDir(path.join(ROOT, "scripts"), path.join(OUT, "scripts"));
+if (fs.existsSync(path.join(ROOT, "content"))) copyDir(path.join(ROOT, "content"), path.join(OUT, "content"));
 if (fs.existsSync(path.join(ROOT, "deploy"))) copyDir(path.join(ROOT, "deploy"), path.join(OUT, "deploy"));
 
 console.log("dist ready:", OUT);

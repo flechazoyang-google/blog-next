@@ -95,4 +95,24 @@ if (fs.existsSync(cfile)) {
   }
 }
 
-console.log(`导入完成: 文章 ${nPost} / 页面 ${nPage} / 说说 ${nShuo} / 评论 ${nComment}`);
+// ===== 补充自建页面（不来自 WordPress，放在 content/pages/）=====
+const SEED_PAGES = path.join(process.cwd(), "content", "pages");
+let nSeed = 0;
+if (fs.existsSync(SEED_PAGES)) {
+  for (const f of fs.readdirSync(SEED_PAGES).filter((x) => x.endsWith(".md"))) {
+    const rawSeed = fs.readFileSync(path.join(SEED_PAGES, f), "utf8");
+    const parsed = matter(rawSeed);
+    const data = parsed.data;
+    const content = parsed.content;
+    const slug = String(data.slug || f.replace(/\.md$/, "")).trim();
+    const d = String(data.date || "").replace("T", " ").slice(0, 19) || new Date().toISOString().slice(0, 19);
+    db.prepare(
+      "INSERT INTO posts (type,title,slug,content,excerpt,status,categories,tags,published_at) " +
+      "VALUES ('page',?,?,?,?,'published','[]','[]',?) " +
+      "ON CONFLICT(type,slug) DO UPDATE SET title=excluded.title, content=excluded.content, excerpt=excluded.excerpt"
+    ).run(data.title || f, slug, content.trim(), excerptOf(content), d);
+    nSeed++;
+  }
+}
+
+console.log("导入完成: 文章 " + nPost + " / 页面 " + nPage + " / 种子页 " + nSeed + " / 说说 " + nShuo + " / 评论 " + nComment);
