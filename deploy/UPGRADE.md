@@ -608,3 +608,29 @@ curl -X PUT https://artalk.yghsite.cn/api/v2/sites/1 \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"name":"flechazo blog","urls":["https://blog.yghsite.cn"]}'
 ```
+
+### 13.9 「评论组件加载失败」的根因（2026-10-21 22:5x）
+
+现象：博客文章页底部显示「评论组件加载失败，请刷新页面重试」。
+
+根因：**Artalk v2 的 UMD 包不是构造函数**。它把 `window.Artalk` 定义成一个**对象**，
+只导出 `{ Defaults, default, init, loadCountWidget, use }`，正确用法是 `Artalk.init(opts)`。
+
+我最初写成了 `new window.Artalk({...})`，于是抛：
+
+```
+TypeError: window.Artalk is not a constructor
+```
+
+脚本本身加载是成功的（198KB、`Content-Type: text/javascript`、CSP 也放行了），
+纯粹是**调用方式**错。用 vm 沙箱实测确认过：
+
+```
+window.Artalk 类型: object
+导出键: Defaults, default, init, loadCountWidget, use
+init 是函数: function
+new 能否用: 否 - A is not a constructor
+```
+
+修复：改成 `Artalk.init({...})`，并把 catch 里的报错**原样显示**出来
+（原来只显示"加载失败"，把真实原因吞掉了 —— 这也是排查多花时间的原因）。
