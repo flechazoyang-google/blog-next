@@ -69,6 +69,10 @@ body {
 a { color: var(--link); text-decoration: none; transition: color .15s; }
 a:hover { color: var(--link-hover); }
 
+/* 手机端顶部栏默认隐藏（PC 不显示）；<=820px 断点内再设为 flex。
+   注意：这条必须写在所有 @media 之前，否则会覆盖断点里的 display:flex */
+.mobile-topbar { display: none; }
+
 /* ── 站点骨架：左导航 + 主内容 + 右目录 ── */
 .site-shell {
   display: grid;
@@ -471,7 +475,6 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 
 /* ── 手机端顶部栏（桌面隐藏，手机端 display:flex 由上面的断点设置） ── */
 .mobile-topbar {
-  display: none;
   position: sticky;
   top: 0;
   z-index: 50;
