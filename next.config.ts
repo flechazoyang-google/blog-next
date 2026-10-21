@@ -41,7 +41,17 @@ const EXTRA_ORIGINS = (process.env.CSP_EXTRA_ORIGINS || "")
   .map((s) => s.trim())
   .filter(Boolean);
 const umamiOrigin = originOf(UMAMI_SRC);
-const allowedOrigins = [...new Set([umamiOrigin, ...EXTRA_ORIGINS].filter(Boolean))];
+
+/**
+ * 评论系统（Artalk）的源。
+ * 与 Umami 同理：构建期拿不到运行期环境变量，所以给默认值兜底。
+ * 若漏了这里，CSP 一旦切 enforce，评论区的脚本/接口会被直接拦掉 ——
+ * 而且不会报错，只会"评论区空白"，非常难查。
+ */
+const ARTALK_SRC = process.env.NEXT_PUBLIC_ARTALK_SRC || "https://artalk.yghsite.cn";
+const artalkOrigin = originOf(ARTALK_SRC);
+
+const allowedOrigins = [...new Set([umamiOrigin, artalkOrigin, ...EXTRA_ORIGINS].filter(Boolean))];
 
 export function buildCsp(extra: { scriptSrc?: string[]; styleSrc?: string[] } = {}) {
   const scriptSrc = ["'self'", "'unsafe-inline'", ...allowedOrigins, ...(extra.scriptSrc ?? [])];

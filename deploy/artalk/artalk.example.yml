@@ -1,0 +1,37 @@
+# Artalk 配置模板（复制到 /opt/artalk/artalk.yml 并把 app_key 换成随机值）
+# 生成 app_key: openssl rand -hex 32
+
+host: 0.0.0.0
+port: 23366
+
+# 数据库
+# ⚠️ type 必须写 sqlite，写 sqlite3 会 panic: unsupported database type
+db:
+  type: sqlite
+  file: /data/artalk.db
+
+cache:
+  type: builtin
+  expires: 60
+
+# 会话签名密钥（勿泄露，勿入库）
+app_key: REPLACE_ME_WITH_openssl_rand_hex_32
+
+site_default: "flechazo blog"
+locale: zh-CN
+timezone: Asia/Shanghai
+
+# 跨域白名单：不含博客域名会导致前端拿不到数据（且不报错，只显示空白）
+trusted_domains:
+  - "https://blog.yghsite.cn"
+  - "https://artalk.yghsite.cn"
+
+# 反代：只信 nginx 的 X-Real-IP，防止客户端伪造
+http:
+  proxy_header: X-Real-IP
+
+# 审核：新评论默认待审
+# ⚠️ 正确键名是 moderator.pending_default，写成顶层 moderator_pending 会被静默忽略
+moderator:
+  pending_default: true
+  notify_pending: true

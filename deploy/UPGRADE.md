@@ -500,3 +500,68 @@ rclone cat jianguoyun:blog-migration-20261021/wordpress-files-20261021.tar.gz \
 
 > 注意：本机已 purge MySQL/PHP，恢复需要重新安装。若只是想查一条历史内容，
 > 更快的办法是把 dump 恢复到任意一台有 MySQL 的机器上，不必动这台。
+
+---
+
+## 十三、评论系统换成 Artalk（2026-10-21 22:x）
+
+### 13.1 访问信息
+
+| 项 | 值 |
+|---|---|
+| 站点 | https://artalk.yghsite.cn |
+| 管理后台 | **https://artalk.yghsite.cn/sidebar/** （v2 不是 /admin） |
+| 管理员账号 | `flechazo`，密码见 `/opt/artalk/ADMIN_PASSWORD.txt`（600 root，**请改掉并存入密码管理器**） |
+| 站点名（site） | `flechazo blog` ← 前端必须与此**完全一致**，否则报"未找到站点" |
+| 部署位置 | `/opt/artalk/`（compose + data + artalk.yml） |
+| 数据库 | SQLite `/opt/artalk/data/artalk.db` |
+| 内存 | 实测 **10 MB** |
+
+### 13.2 部署时踩的四个坑（都已解决）
+
+1. **`db.type` 必须写 `sqlite`，不能写 `sqlite3`** —— 写 `sqlite3` 会 panic：`unsupported database type sqlite3`。
+2. **配置文件路径是 `/data/artalk.yml`，不是 `/conf/`** —— 镜像 entrypoint 自动读它；
+   若在 command 里传 `-c /conf/xxx.yml`，会顶掉默认的 `server` 子命令，容器起来就退出。
+3. **`host` 要写 `0.0.0.0`** —— 写 `127.0.0.1` 时容器内只绑回环，宿主端口映射进不去（curl 000）。
+4. **审核键名是 `moderator.pending_default`，不是 `moderator_pending`** ——
+   写成顶层会被**静默忽略**，评论直接公开。这个最危险，因为不报错。实测改对后 `is_pending=1`。
+
+另外 nginx 1.24 不支持独立的 `http2 on;`，必须写 `listen 443 ssl http2;`。
+
+### 13.3 博客侧改动
+
+- `components/CommentSection.tsx` 重写为 Artalk 客户端
+  - 异步加载 `https://artalk.yghsite.cn/dist/Artalk.js`（198KB）
+  - `pageKey` 用文章 slug 而非 id：换库/重建时评论不会错位
+- `app/[slug]/page.tsx` 传入 `pageKey`
+- **CSP 放行**（关键，漏了会"评论区空白"且无报错）：
+  `next.config.ts` 的 `allowedOrigins` 已加入 artalk 域名，
+  `script-src` / `connect-src` 均已验证包含。
+
+### 13.4 旧评论系统
+
+自研评论（`app/api/comments`、`comments` 表、后台评论审核页）**保留未删**，
+但前端已不再调用。观察一段时间确认 Artalk 稳定后可清理。
+
+原 2 条历史评论按要求**未迁移**。
+
+### 13.5 常用命令
+
+```bash
+cd /opt/artalk
+docker compose ps                 # 状态
+docker logs -f artalk             # 日志
+docker compose restart            # 重启
+docker stats --no-stream artalk   # 内存
+sudo cat /opt/artalk/ADMIN_PASSWORD.txt
+```
+
+### 13.6 备份（待补）
+
+Artalk 数据在 `/opt/artalk/data/artalk.db`（单文件 SQLite）。
+**当前 blog-backup 脚本不包含它**。若要纳入备份，在 `/usr/local/bin/blog-backup`
+打包段加一行：
+
+```bash
+sqlite3 /opt/artalk/data/artalk.db ".backup '$TMP/artalk.db'"
+```

@@ -119,7 +119,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             </nav>
           ) : null}
 
-          {post && settings.commentEnabled ? <CommentSection postId={doc.id} /> : null}
+          {post && settings.commentEnabled ? <CommentSection postId={doc.id} pageKey={"/" + decodeSlug(slug)} /> : null}
         </main>
         <div className="toc-col"><RightBar toc={toc} /></div>
       </div>

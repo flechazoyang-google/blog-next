@@ -1,0 +1,16 @@
+# Artalk 评论系统
+# 部署位置：/opt/artalk/
+# 启动：docker compose up -d
+services:
+  artalk:
+    image: artalk/artalk-go:latest
+    container_name: artalk
+    restart: always
+    ports:
+      - "127.0.0.1:23366:23366"
+    volumes:
+      - ./data:/data
+      - ./artalk.yml:/data/artalk.yml:ro
+    environment:
+      - TZ=Asia/Shanghai
+    mem_limit: 192m

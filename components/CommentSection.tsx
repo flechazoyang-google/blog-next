@@ -1,112 +1,97 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-type C = { id: number; author: string; url: string; content: string; created_at: string; parent_id: number | null };
+/**
+ * 评论区 —— 接入自建 Artalk（https://artalk.js.org）。
+ *
+ * 为什么换掉自研评论：
+ *   原实现只有「提交 -> 待审 -> 后台通过」一条链路，没有回复、通知、
+ *   反垃圾，后台也只能逐条点按钮。Artalk 这些都做好了，且数据在自己机器上。
+ *
+ * 关键点：
+ *   1) 脚本异步加载，不阻塞首屏
+ *   2) pageKey 用 slug（不用 id）：换库/重建时评论不会错位
+ *   3) CSP 必须放行 artalk 域名，否则脚本加载了却不生效（见 next.config.ts）
+ */
+const ARTALK_SRC = process.env.NEXT_PUBLIC_ARTALK_SRC || "https://artalk.yghsite.cn";
+const ARTALK_SITE = process.env.NEXT_PUBLIC_ARTALK_SITE || "flechazo blog";
 
-export function CommentSection({ postId }: { postId: number }) {
-  const [comments, setComments] = useState<C[]>([]);
-  const [author, setAuthor] = useState("");
-  const [email, setEmail] = useState("");
-  const [url, setUrl] = useState("");
-  const [content, setContent] = useState("");
-  const [website, setWebsite] = useState(""); // 蜜罐
-  const [msg, setMsg] = useState("");
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
+type ArtalkInstance = { destroy: () => void; reload: () => void };
 
-  const load = () => {
-    fetch(`/api/comments?post_id=${postId}`)
-      .then((r) => r.json())
-      .then((d) => Array.isArray(d) && setComments(d))
-      .catch(() => {});
-  };
+declare global {
+  interface Window {
+    Artalk?: new (opts: Record<string, unknown>) => ArtalkInstance;
+  }
+}
+
+let loading: Promise<void> | null = null;
+
+/** 只加载一次 Artalk 主脚本，多个组件共享 */
+function loadArtalk(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.Artalk) return Promise.resolve();
+  if (loading) return loading;
+
+  loading = new Promise<void>((resolve, reject) => {
+    const sel = "script[data-artalk-src]";
+    const existing = document.querySelector<HTMLScriptElement>(sel);
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("artalk load failed")));
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = ARTALK_SRC + "/dist/Artalk.js";
+    s.async = true;
+    s.dataset.artalkSrc = "1";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("artalk load failed"));
+    document.head.appendChild(s);
+  });
+  return loading;
+}
+
+export function CommentSection({ postId, pageKey }: { postId: number; pageKey: string }) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const instanceRef = useRef<ArtalkInstance | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    load();
-    try {
-      const saved = JSON.parse(localStorage.getItem("commenter") || "{}");
-      if (saved.author) setAuthor(saved.author);
-      if (saved.email) setEmail(saved.email);
-      if (saved.url) setUrl(saved.url);
-    } catch {}
-  }, [postId]);
+    let alive = true;
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true); setMsg(""); setErr("");
-    const res = await fetch("/api/comments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_id: postId, author, email, url, content, website }),
-    });
-    const data = await res.json().catch(() => ({}));
-    setBusy(false);
-    if (res.ok) {
-      setContent("");
-      setMsg(data.message || "已提交，待审核");
-      localStorage.setItem("commenter", JSON.stringify({ author, email, url }));
-    } else {
-      setErr(data.error || "提交失败");
-    }
-  };
+    loadArtalk()
+      .then(() => {
+        if (!alive || !hostRef.current || !window.Artalk) return;
+        // 同容器重复挂载时先销毁旧实例，避免评论重复渲染
+        instanceRef.current?.destroy();
+        instanceRef.current = new window.Artalk({
+          el: hostRef.current,
+          server: ARTALK_SRC,
+          site: ARTALK_SITE,
+          pageKey,
+          pageTitle: document.title,
+          locale: "zh-CN",
+          darkMode: "auto",
+          imgUpload: false,
+        });
+      })
+      .catch(() => {
+        if (alive) setError("评论组件加载失败，请刷新页面重试");
+      });
+
+    return () => {
+      alive = false;
+      instanceRef.current?.destroy();
+      instanceRef.current = null;
+    };
+  }, [pageKey]);
 
   return (
-    <section className="comments">
-      <h2 className="comments-title">评论{comments.length ? ` (${comments.length})` : ""}</h2>
-
-      {comments.length === 0 ? (
-        <div className="empty" style={{ padding: "20px 0" }}>还没有评论，来说点什么吧</div>
-      ) : comments.map((c) => (
-        <div key={c.id} className="comment">
-          <div className="comment-avatar">{c.author.slice(0, 1).toUpperCase()}</div>
-          <div className="comment-body">
-            <div className="comment-head">
-              {c.url ? <a className="comment-author" href={c.url} target="_blank" rel="nofollow noopener ugc">{c.author}</a>
-                     : <span className="comment-author">{c.author}</span>}
-              <span className="comment-date">{c.created_at.slice(0, 10)}</span>
-            </div>
-            <div className="comment-text">{c.content}</div>
-          </div>
-        </div>
-      ))}
-
-      <form onSubmit={submit} style={{ marginTop: 28 }}>
-        {msg ? <div className="notice notice-ok">{msg}</div> : null}
-        {err ? <div className="notice notice-error">{err}</div> : null}
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-          <div className="field">
-            <label>昵称 *</label>
-            <input className="input" value={author} onChange={(e) => setAuthor(e.target.value)} required maxLength={40} />
-          </div>
-          <div className="field">
-            <label>邮箱</label>
-            <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={120} />
-          </div>
-          <div className="field">
-            <label>网站</label>
-            <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} maxLength={200} />
-          </div>
-        </div>
-
-        <div className="field">
-          <label>内容 *</label>
-          <textarea className="textarea" value={content} onChange={(e) => setContent(e.target.value)} required maxLength={2000} />
-        </div>
-
-        {/* 蜜罐：对用户隐藏 */}
-        <input
-          tabIndex={-1} autoComplete="off" value={website}
-          onChange={(e) => setWebsite(e.target.value)}
-          style={{ position: "absolute", left: "-9999px", opacity: 0, height: 0 }}
-          aria-hidden
-        />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button className="btn btn-primary" disabled={busy}>{busy ? "提交中…" : "提交评论"}</button>
-          <span style={{ fontSize: ".78rem", color: "var(--text-p4)" }}>提交后需审核通过才会显示</span>
-        </div>
-      </form>
+    <section className="comments" data-post-id={postId}>
+      {error ? (
+        <div className="notice notice-error" style={{ marginBottom: 12 }}>{error}</div>
+      ) : null}
+      <div ref={hostRef} />
     </section>
   );
 }
