@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { SearchBox } from "./SearchBox";
 
 const NAV = [
   { href: "/", label: "文章", icon: "📄" },
@@ -22,7 +21,6 @@ export function Sidebar({ active }: { active?: string }) {
       </Link>
 
       {/* 虚线边框的搜索框 */}
-      <SearchBox variant="dashed" />
 
       {/* 图标导航 */}
       <nav className="nav">

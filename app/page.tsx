@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { PostCard } from "@/components/PostCard";
 import { Animations } from "@/components/Animations";
+import { SearchBox } from "@/components/SearchBox";
 import { RightBar } from "@/components/RightBar";
 import { listPosts, countPosts, parseJsonArray, makeExcerpt, readingTime } from "@/lib/posts";
 
@@ -20,6 +21,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       <div className="site-shell">
         <Sidebar active="/" />
         <main className="content">
+          {/* PC 端：文章列表顶部搜索框（手机端隐藏，用顶部栏搜索） */}
+          <div className="content-search">
+            <SearchBox variant="dashed" />
+          </div>
           <div className="post-list">
             {posts.length === 0 ? (
               <div className="empty">还没有文章</div>

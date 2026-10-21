@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
 import { formatDate, toIso } from "@/components/PostCard";
-import { getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt } from "@/lib/posts";
+import { decodeSlug, getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt } from "@/lib/posts";
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
@@ -39,7 +39,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
       <Animations />
       <Lightbox />
       <div className="site-shell">
-        <Sidebar active="" />
+        <Sidebar active={"/" + decodeSlug(slug)} />
         <main className="content">
           <article>
             <header className="article-header">

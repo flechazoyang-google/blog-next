@@ -756,7 +756,8 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 /* ── 底部链接 ── */
 .side-bottom {
   display: flex;
-  gap: 20px;
+  justify-content: center;   /* 居中 */
+  gap: 22px;
   margin-top: 34px;
   padding: 16px 18px;
   font-size: .84rem;
@@ -908,4 +909,21 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 .mobile-search-form button {
   border: none; background: none; cursor: pointer;
   color: var(--link); font-size: .85rem; padding: 0 4px; white-space: nowrap;
+}
+
+/* ── 文章列表顶部搜索框（PC） ── */
+.content-search {
+  margin-bottom: 24px;
+}
+.content-search .search-box--dashed {
+  margin-bottom: 0;
+  max-width: 100%;
+}
+.content-search .search-box input {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+/* 手机端隐藏（顶部栏已有搜索） */
+@media (max-width: 820px) {
+  .content-search { display: none; }
 }
