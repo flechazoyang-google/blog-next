@@ -727,3 +727,94 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   background: var(--bg-subtle);
   border-color: var(--border);
 }
+
+/* ── 右侧栏 ── */
+.rightbar {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  font-size: .84rem;
+}
+.rightbar-block { display: flex; flex-direction: column; gap: 10px; }
+.rightbar-title {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-p4);
+  font-weight: 600;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat-item b {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--text-p0);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.stat-item span { font-size: .7rem; color: var(--text-p4); }
+
+/* 右栏目录 */
+.toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-left: 1px solid var(--border);
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.toc-list li a {
+  display: block;
+  padding: 4px 0 4px 11px;
+  color: var(--text-p3);
+  line-height: 1.5;
+  font-size: .8rem;
+  border-left: 2px solid transparent;
+  margin-left: -1px;
+  transition: color .15s, border-color .15s;
+}
+.toc-list li a:hover { color: var(--text-p0); border-left-color: var(--border-strong); }
+.toc-list li.lv3 a { padding-left: 22px; font-size: .76rem; }
+
+/* 右栏 sticky */
+.toc-col {
+  position: sticky;
+  top: 40px;
+  align-self: start;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+/* ── 手机端搜索态顶部栏 ── */
+.mobile-searchbar { padding: 0 12px; }
+.mobile-search-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+}
+.mobile-search-form .msi { position: absolute; left: 11px; color: var(--text-p4); pointer-events: none; }
+.mobile-search-form input {
+  flex: 1;
+  padding: 8px 12px 8px 33px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  color: var(--text-p0);
+  font-size: .88rem;
+  font-family: inherit;
+}
+.mobile-search-form input:focus { outline: none; border-color: var(--border-strong); background: var(--bg); }
+.mobile-search-form button {
+  border: none; background: none; cursor: pointer;
+  color: var(--link); font-size: .85rem; padding: 0 4px; white-space: nowrap;
+}

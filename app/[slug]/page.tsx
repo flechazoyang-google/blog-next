@@ -7,6 +7,7 @@ import { getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
+import { RightBar } from "@/components/RightBar";
 
 export const dynamic = "force-dynamic";
 
@@ -89,18 +90,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
           {post ? <CommentSection postId={doc.id} /> : null}
         </main>
         <div className="toc-col">
-          {toc.length > 0 ? (
-            <aside className="toc">
-              <div className="toc-title">本文目录</div>
-              <ul>
-                {toc.map((t, i) => (
-                  <li key={i} className={t.level === 3 ? "lv3" : ""}>
-                    <a href={`#${t.id}`}>{t.text}</a>
-                  </li>
-                ))}
-              </ul>
-            </aside>
-          ) : null}
+          <RightBar toc={toc} />
         </div>
       </div>
     </>

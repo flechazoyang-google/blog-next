@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { PostCard } from "@/components/PostCard";
 import { Animations } from "@/components/Animations";
+import { RightBar } from "@/components/RightBar";
 import { listPosts, countPosts, parseJsonArray, makeExcerpt, readingTime } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +47,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </div>
           ) : null}
         </main>
-        <div className="toc-col" />
+        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );

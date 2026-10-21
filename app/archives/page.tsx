@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
+import { RightBar } from "@/components/RightBar";
 import { formatDate } from "@/components/PostCard";
 import { listArchives } from "@/lib/posts";
 
@@ -29,7 +30,7 @@ export default function ArchivesPage() {
             </section>
           ))}
         </main>
-        <div className="toc-col" />
+        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );

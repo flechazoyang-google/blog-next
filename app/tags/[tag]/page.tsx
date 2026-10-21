@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
+import { RightBar } from "@/components/RightBar";
 import { PostCard } from "@/components/PostCard";
 import { getDb } from "@/lib/db";
 import { makeExcerpt, parseJsonArray, decodeSlug } from "@/lib/posts";
@@ -46,7 +47,7 @@ export default async function TagPage({ params }: { params: Promise<{ tag: strin
             ))}
           </div>
         </main>
-        <div className="toc-col" />
+        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );

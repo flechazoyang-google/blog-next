@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
+import { RightBar } from "@/components/RightBar";
 import { formatDate } from "@/components/PostCard";
 import { listShuoshuo } from "@/lib/posts";
 import { renderMarkdown } from "@/lib/markdown";
@@ -27,7 +28,7 @@ export default function ShuoshuoPage() {
             ))}
           </div>
         </main>
-        <div className="toc-col" />
+        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );

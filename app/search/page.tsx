@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
+import { RightBar } from "@/components/RightBar";
 import { SearchBox } from "@/components/SearchBox";
 import { PostCard } from "@/components/PostCard";
 import { getDb } from "@/lib/db";
@@ -56,7 +57,7 @@ export default async function SearchPage({
             ))}
           </div>
         </main>
-        <div className="toc-col" />
+        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );
