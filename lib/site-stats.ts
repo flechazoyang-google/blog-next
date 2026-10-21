@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 
-export type Stat = { label: string; value: string };
+export type Stat = { label: string; value: string; icon: string };
 
 /**
  * 站点统计。
@@ -29,11 +29,11 @@ export function getSiteStats(): Stat[] {
   const views = 12800 + posts * 73;
 
   return [
-    { label: "文章", value: String(posts) },
-    { label: "说说", value: String(shuo) },
-    { label: "评论", value: String(comments) },
-    { label: "运行", value: days + "天" },
-    { label: "访问", value: views >= 10000 ? (views / 10000).toFixed(1) + "w" : String(views) },
+    { label: "文章", value: String(posts), icon: "📝" },
+    { label: "说说", value: String(shuo), icon: "💬" },
+    { label: "评论", value: String(comments), icon: "🗨" },
+    { label: "运行", value: days + "天", icon: "⏳" },
+    { label: "访问", value: views >= 10000 ? (views / 10000).toFixed(1) + "w" : String(views), icon: "👁" },
   ];
 }
 
