@@ -5,6 +5,27 @@ import path from "node:path";
 import fs from "node:fs";
 import matter from "gray-matter";
 
+
+/** 把各种脏日期统一成 "YYYY-MM-DD HH:MM:SS" */
+function normalizeDate(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  // 已经是 ISO 或 "YYYY-MM-DD HH:MM:SS"
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2})?[:]?(\d{2})?[:]?(\d{2})?/);
+  if (m) {
+    const [, y, mo, d, h = "00", mi = "00", se = "00"] = m;
+    return y + "-" + mo + "-" + d + " " + h + ":" + mi + ":" + se;
+  }
+  // "Mon May 25 2026 22:30:00" 这类
+  const t = new Date(s);
+  if (!isNaN(t.getTime())) {
+    const p = (n) => String(n).padStart(2, "0");
+    return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + " " +
+           p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds());
+  }
+  return null;
+}
+
 const SRC = process.env.MIGRATE_SRC || "/root/blog-migrate/out";
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 const db = new Database(path.join(DATA_DIR, "blog.db"));
@@ -34,7 +55,7 @@ let nPost = 0, nPage = 0, nShuo = 0, nComment = 0;
 for (const { data, content } of readDir("posts")) {
   const slug = String(data.slug || "").trim();
   if (!slug) { console.warn("跳过无 slug:", data.title); continue; }
-  const d = String(data.date || "").replace("T", " ").slice(0, 19);
+  const d = normalizeDate(data.date) || "";
   db.prepare(`INSERT INTO posts (type,title,slug,content,excerpt,status,categories,tags,wp_id,published_at)
     VALUES ('post',?,?,?,?,'published',?,?,?,?)
     ON CONFLICT(type,slug) DO UPDATE SET title=excluded.title, content=excluded.content,
@@ -49,7 +70,7 @@ for (const { data, content } of readDir("posts")) {
 for (const { data, content } of readDir("pages")) {
   const slug = String(data.slug || "").trim();
   if (!slug) continue;
-  const d = String(data.date || "").replace("T", " ").slice(0, 19);
+  const d = normalizeDate(data.date) || "";
   db.prepare(`INSERT INTO posts (type,title,slug,content,excerpt,status,categories,tags,wp_id,published_at)
     VALUES ('page',?,?,?,?,'published','[]','[]',?,?)
     ON CONFLICT(type,slug) DO UPDATE SET title=excluded.title, content=excluded.content`)
@@ -59,7 +80,7 @@ for (const { data, content } of readDir("pages")) {
 
 // 说说
 for (const { data, content } of readDir("shuoshuo")) {
-  const d = String(data.date || "").replace("T", " ").slice(0, 19);
+  const d = normalizeDate(data.date) || "";
   const slug = "shuo-" + (data.wp_id || d.replace(/\D/g, "").slice(0, 14));
   db.prepare(`INSERT INTO posts (type,title,slug,content,excerpt,status,categories,tags,wp_id,published_at)
     VALUES ('shuoshuo','',?,?,'','published','[]','[]',?,?)
@@ -105,7 +126,7 @@ if (fs.existsSync(SEED_PAGES)) {
     const data = parsed.data;
     const content = parsed.content;
     const slug = String(data.slug || f.replace(/\.md$/, "")).trim();
-    const d = String(data.date || "").replace("T", " ").slice(0, 19) || new Date().toISOString().slice(0, 19);
+    const d = normalizeDate(data.date) || new Date().toISOString().slice(0, 19);
     db.prepare(
       "INSERT INTO posts (type,title,slug,content,excerpt,status,categories,tags,published_at) " +
       "VALUES ('page',?,?,?,?,'published','[]','[]',?) " +

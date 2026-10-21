@@ -308,7 +308,15 @@ a:hover { color: var(--link-hover); }
 .post-nav .next { text-align: right; }
 
 /* ── 目录 ── */
-.toc { position: sticky; top: 48px; font-size: .82rem; }
+/* 外层列也要参与 sticky，否则父级高度不够，sticky 会失效跟着滚走 */
+.toc-col {
+  position: sticky;
+  top: 48px;
+  align-self: start;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+}
+.toc { font-size: .82rem; }
 .toc-title {
   font-size: .72rem; text-transform: uppercase; letter-spacing: .08em;
   color: var(--text-p4); margin-bottom: 12px; font-weight: 600;

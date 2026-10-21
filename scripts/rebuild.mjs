@@ -10,6 +10,27 @@
 import Database from "better-sqlite3";
 import path from "node:path";
 
+
+/** 把各种脏日期统一成 "YYYY-MM-DD HH:MM:SS" */
+function normalizeDate(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  // 已经是 ISO 或 "YYYY-MM-DD HH:MM:SS"
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ]?(\d{2})?[:]?(\d{2})?[:]?(\d{2})?/);
+  if (m) {
+    const [, y, mo, d, h = "00", mi = "00", se = "00"] = m;
+    return y + "-" + mo + "-" + d + " " + h + ":" + mi + ":" + se;
+  }
+  // "Mon May 25 2026 22:30:00" 这类
+  const t = new Date(s);
+  if (!isNaN(t.getTime())) {
+    const p = (n) => String(n).padStart(2, "0");
+    return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + " " +
+           p(t.getHours()) + ":" + p(t.getMinutes()) + ":" + p(t.getSeconds());
+  }
+  return null;
+}
+
 const DB = path.join(process.env.DATA_DIR || "/var/lib/blog", "blog.db");
 const db = new Database(DB);
 
@@ -27,6 +48,16 @@ for (const [oldS, newS] of Object.entries(SLUG_FIX)) {
   db.prepare("UPDATE posts SET slug=? WHERE id=?").run(newS, row.id);
   console.log("slug:", oldS, "->", newS);
 }
+
+// —— 日期规范化（修 "Mon May 25 2026 22:" 这类脏数据）——
+const dateRows = db.prepare("SELECT id, published_at FROM posts").all();
+const dateUpd = db.prepare("UPDATE posts SET published_at=? WHERE id=?");
+let nDate = 0;
+for (const r of dateRows) {
+  const fixed = normalizeDate(r.published_at);
+  if (fixed && fixed !== r.published_at) { dateUpd.run(fixed, r.id); nDate++; }
+}
+console.log("日期已规范化:", nDate, "条");
 
 // —— 摘要重生成 ——
 const FENCE = "\u0060\u0060\u0060";
