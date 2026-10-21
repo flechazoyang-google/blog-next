@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /** 侧栏搜索框：回车或点按钮跳转 /search?q= */
-export function SearchBox({ initial = "" }: { initial?: string }) {
+export function SearchBox({ initial = "", variant }: { initial?: string; variant?: "dashed" }) {
   const [q, setQ] = useState(initial);
   const router = useRouter();
 
@@ -14,7 +14,7 @@ export function SearchBox({ initial = "" }: { initial?: string }) {
   };
 
   return (
-    <form className="search-box" onSubmit={submit} role="search">
+    <form className={"search-box" + (variant === "dashed" ? " search-box--dashed" : "")} onSubmit={submit} role="search">
       <svg className="search-icon" viewBox="0 0 24 24" width="15" height="15" aria-hidden>
         <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
         <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
