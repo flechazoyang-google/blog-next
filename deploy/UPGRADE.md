@@ -704,3 +704,31 @@ Artalk 的 `limit` 默认是 0，不是"不限"。用 curl 验证时必须带上
 
 只传 `{"is_pending":false}` 会报 `Site_name必须填写`。
 （正常使用时不需要手工调这个接口，在 `/sidebar` 界面点「通过」即可。）
+
+### 13.12 「控制中心」打不开（2026-10-22 00:1x）
+
+现象：博客评论区点「控制中心」，右侧弹出白色面板并显示
+「artalk.yghsite.cn 拒绝了我们的连接请求」。
+
+根因：**我自己在 artalk 的 nginx 配置里加了 `X-Frame-Options: SAMEORIGIN`**。
+控制中心是从 `blog.yghsite.cn` 用 iframe 嵌入 `artalk.yghsite.cn` 的，
+跨子域，`SAMEORIGIN` 直接拒绝。
+
+```diff
+- add_header X-Frame-Options SAMEORIGIN always;
++ # 不要 X-Frame-Options：控制中心是从博客页 iframe 跨子域打开的
++ add_header Content-Security-Policy "frame-ancestors https://blog.yghsite.cn https://artalk.yghsite.cn 'self'" always;
+```
+
+用 `frame-ancestors` 代替 `X-Frame-Options`：同样能防点击劫持，但可以**精确限定**
+哪些站点有资格嵌入，而不是粗暴的"只能同源"。
+
+另一侧也要通：博客页自身的 CSP 里 `frame-src` 必须允许 artalk 域名。
+当前值是 `frame-src 'self' https:`，已覆盖。
+
+验证：
+
+```bash
+curl -skI https://artalk.yghsite.cn/sidebar/ | grep -iE "x-frame|frame-ancestors"
+# 期望：只有 content-security-policy: frame-ancestors ...，没有 x-frame-options
+```
