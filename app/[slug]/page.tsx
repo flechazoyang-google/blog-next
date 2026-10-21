@@ -7,6 +7,7 @@ import { getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
+import { categoryColor } from "@/lib/category-color";
 import { RightBar } from "@/components/RightBar";
 
 export const dynamic = "force-dynamic";
@@ -44,9 +45,14 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             <header className="article-header">
               {cats.length > 0 ? (
                 <div className="article-eyebrow">
-                  {cats.map((c) => (
-                    <span key={c} className="cat-pill">{c}</span>
-                  ))}
+                  {cats.map((c) => {
+                    const col = categoryColor(c);
+                    return (
+                      <span key={c} className="cat-pill" style={{ color: col.fg, background: col.bg }}>
+                        {c}
+                      </span>
+                    );
+                  })}
                 </div>
               ) : null}
               <h1 className="article-title">{doc.title}</h1>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { categoryColor } from "@/lib/category-color";
 
 type Props = {
   href: string;
@@ -17,9 +18,14 @@ export function PostCard({ href, title, excerpt, date, categories = [], readingT
       <div className="meta">
         <time dateTime={toIso(date)}>{formatDate(date)}</time>
         {readingTime ? <><span className="dot">·</span><span>{readingTime} 分钟</span></> : null}
-        {categories.map((c) => (
-          <span key={c} className="cat">{c}</span>
-        ))}
+        {categories.map((c) => {
+          const col = categoryColor(c);
+          return (
+            <span key={c} className="cat" style={{ color: col.fg, background: col.bg }}>
+              {c}
+            </span>
+          );
+        })}
       </div>
     </Link>
   );

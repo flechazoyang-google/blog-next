@@ -2,8 +2,8 @@
 
 /* ── 设计令牌：参考 xaoxuu.com / Stellar，纯白极简 ── */
 :root {
-  --bg: #ffffff;
-  --bg-subtle: #fafafa;
+  --bg: #fffefc;
+  --bg-subtle: #f7f6f3;
   --text-p0: #111111;
   --text-p1: rgba(0,0,0,.80);
   --text-p2: rgba(0,0,0,.70);
@@ -11,8 +11,20 @@
   --text-p4: rgba(0,0,0,.38);
   --border: rgba(0,0,0,.07);
   --border-strong: rgba(0,0,0,.10);
-  --link: #1a6b5a;
-  --link-hover: #0f4a3d;
+  /* 主色：低饱和青绿，克制的点缀 */
+  --link: #2f7a6b;
+  --link-hover: #1f5c50;
+  --accent: #d97757;
+  --accent-soft: rgba(217,119,87,.10);
+  --bg-warm: #faf9f7;
+  --bg-tint: rgba(47,122,107,.035);
+  --cat-1: #2f7a6b;  --cat-1-bg: rgba(47,122,107,.10);
+  --cat-2: #6b7fa3;  --cat-2-bg: rgba(107,127,163,.10);
+  --cat-3: #a3766b;  --cat-3-bg: rgba(163,118,107,.10);
+  --cat-4: #7a6ba3;  --cat-4-bg: rgba(122,107,163,.10);
+  --cat-5: #a39a6b;  --cat-5-bg: rgba(163,154,107,.10);
+  --cat-6: #6b9aa3;  --cat-6-bg: rgba(107,154,163,.10);
+  --cat-7: #a36b8a;  --cat-7-bg: rgba(163,107,138,.10);
   --code-bg: rgba(0,0,0,.035);
   --card-bg: #ffffff;
   --radius: 24px;
@@ -32,6 +44,19 @@
   :root {
     --bg: #141414;
     --bg-subtle: #1a1a1a;
+    --bg-warm: #171717;
+    --link: #5fbfa8;
+    --link-hover: #86d8c2;
+    --accent: #e08968;
+    --accent-soft: rgba(224,137,104,.14);
+    --bg-tint: rgba(95,191,168,.06);
+    --cat-1: #5fbfa8;  --cat-1-bg: rgba(95,191,168,.13);
+    --cat-2: #8fa3c9;  --cat-2-bg: rgba(143,163,201,.13);
+    --cat-3: #c99a8c;  --cat-3-bg: rgba(201,154,140,.13);
+    --cat-4: #9d8cc9;  --cat-4-bg: rgba(157,140,201,.13);
+    --cat-5: #c9be8c;  --cat-5-bg: rgba(201,190,140,.13);
+    --cat-6: #8cc4c9;  --cat-6-bg: rgba(140,196,201,.13);
+    --cat-7: #c98cb0;  --cat-7-bg: rgba(201,140,176,.13);
     --text-p0: rgba(255,255,255,.95);
     --text-p1: rgba(255,255,255,.85);
     --text-p2: rgba(255,255,255,.72);
@@ -39,8 +64,6 @@
     --text-p4: rgba(255,255,255,.38);
     --border: rgba(255,255,255,.09);
     --border-strong: rgba(255,255,255,.14);
-    --link: #5fd3b8;
-    --link-hover: #8ee7d0;
     --code-bg: rgba(255,255,255,.06);
     --card-bg: #1a1a1a;
   }
@@ -128,6 +151,7 @@ a:hover { color: var(--link-hover); }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card-bg);
+  background-image: linear-gradient(180deg, rgba(47,122,107,.012), transparent 120px);
   position: relative;
   overflow: hidden;
   transition: border-color .2s, transform .2s, box-shadow .2s;
@@ -144,9 +168,23 @@ a:hover { color: var(--link-hover); }
 .post-card:hover::before { opacity: 1; }
 .post-card:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 2px 12px rgba(0,0,0,.04);
+  box-shadow: 0 4px 18px rgba(47,122,107,.07), 0 1px 3px rgba(0,0,0,.03);
   text-decoration: none;
 }
+/* 卡片左侧一道渐隐的彩色竖线，hover 时显现 */
+.post-card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--link), transparent);
+  opacity: 0;
+  transition: opacity .25s;
+}
+.post-card:hover::after { opacity: .5; }
 
 .post-card h2 {
   font-family: var(--font-serif);
@@ -179,8 +217,9 @@ a:hover { color: var(--link-hover); }
   padding: 1px 9px;
   border-radius: 999px;
   background: var(--bg-subtle);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   font-size: .75rem;
+  font-weight: 500;
 }
 
 /* ── 文章正文排版 ── */
@@ -226,7 +265,15 @@ a:hover { color: var(--link-hover); }
   cursor: zoom-in;
 }
 .prose hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
-.prose a { border-bottom: 1px solid color-mix(in oklab, var(--link) 35%, transparent); }
+.prose a {
+  color: var(--link);
+  border-bottom: 1px solid color-mix(in oklab, var(--link) 28%, transparent);
+  transition: border-color .15s, background .15s;
+}
+.prose a:hover {
+  border-bottom-color: var(--link);
+  background: var(--bg-tint);
+}
 .prose a:hover { border-bottom-color: var(--link); }
 
 .prose code {
@@ -692,7 +739,7 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 .nav-item.is-active .nav-ico { opacity: 1; }
 .nav-dot {
   width: 7px; height: 7px; border-radius: 50%;
-  background: #f5a623; flex-shrink: 0;
+  background: var(--accent); flex-shrink: 0;
 }
 
 /* ── 底部链接 ── */
@@ -732,9 +779,7 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   letter-spacing: .04em;
 }
 .article-eyebrow .cat-pill {
-  color: var(--link);
-  background: color-mix(in oklab, var(--link) 8%, transparent);
-  padding: 2px 9px;
+  padding: 2px 10px;
   border-radius: 999px;
   font-size: .74rem;
   font-weight: 550;
