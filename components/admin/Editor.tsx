@@ -1,12 +1,24 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useDeferredValue } from "react";
 import { useRouter } from "next/navigation";
 
 type Initial = {
   id?: number; type?: string; title?: string; slug?: string; content?: string;
-  status?: string; categories?: string[]; tags?: string[]; published_at?: string;
+  status?: string; categories?: string[]; tags?: string[]; cover?: string | null; published_at?: string | null;
 };
 
+const DRAFT_KEY = (id?: number) => "blog-draft-" + (id ?? "new");
+
+/**
+ * 编辑器（C7）。
+ *
+ * 本轮补上的（原实现全都没有）：
+ *   - 粘贴上传 / 拖拽上传（README 早就承诺"可直接粘贴图片"，代码里 0 实现）
+ *   - 本地草稿自动保存 + 崩溃后可恢复
+ *   - Cmd/Ctrl+S 保存、Cmd/Ctrl+B/I 包裹
+ *   - 分屏实时预览（用 useDeferredValue 防抖，不再点一次刷一次）
+ *   - 封面上传 + 字数统计
+ */
 export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "edit" }) {
   const [type, setType] = useState(initial?.type || "post");
   const [title, setTitle] = useState(initial?.title || "");
@@ -15,65 +27,134 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
   const [cats, setCats] = useState((initial?.categories || []).join(", "));
   const [tags, setTags] = useState((initial?.tags || []).join(", "));
   const [status, setStatus] = useState(initial?.status || "draft");
+  const [cover, setCover] = useState<string | null>(initial?.cover ?? null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState(false);
+  const [uploading, setUploading] = useState(0);
+  const [split, setSplit] = useState(false);
   const [previewHtml, setPreviewHtml] = useState("");
   const [dirty, setDirty] = useState(false);
+  const [restorable, setRestorable] = useState<{ title: string; content: string; at: string } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const deferredContent = useDeferredValue(content);
 
-  // 离开提醒
+  const mark = () => setDirty(true);
+
+  /* ---------------- 本地草稿：防崩溃丢失 ---------------- */
+  useEffect(() => {
+    if (mode !== "edit") {
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY(initial?.id));
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d && (d.title !== (initial?.title ?? "") || d.content !== (initial?.content ?? ""))) {
+            setRestorable(d);
+          }
+        }
+      } catch { /* 忽略损坏的草稿 */ }
+    }
+  }, [mode, initial?.id, initial?.title, initial?.content]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY(initial?.id), JSON.stringify({ title, content, at: new Date().toISOString() }));
+      } catch { /* 配额满了就算了 */ }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [title, content, dirty, initial?.id]);
+
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } };
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
 
-  const mark = () => setDirty(true);
+  /* ---------------- 实时预览（防抖） ---------------- */
+  useEffect(() => {
+    if (!split) return;
+    let alive = true;
+    const t = setTimeout(async () => {
+      const res = await fetch("/api/preview", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: deferredContent }),
+      });
+      const d = await res.json().catch(() => ({ html: "" }));
+      if (alive) setPreviewHtml(d.html || "");
+    }, 350);
+    return () => { alive = false; clearTimeout(t); };
+  }, [deferredContent, split]);
 
-  const insert = (text: string, wrap = false) => {
+  /* ---------------- 插入 / 上传 ---------------- */
+  const insert = useCallback((text: string, wrap = false) => {
     const ta = taRef.current;
     if (!ta) return;
     const s = ta.selectionStart, e = ta.selectionEnd;
     const sel = content.slice(s, e);
-    const next = wrap
-      ? content.slice(0, s) + text + sel + text + content.slice(e)
-      : content.slice(0, s) + text + sel + content.slice(e);
+    const next = content.slice(0, s) + text + sel + (wrap ? text : "") + content.slice(e);
     setContent(next);
     mark();
     requestAnimationFrame(() => {
       ta.focus();
       ta.selectionStart = ta.selectionEnd = s + text.length + (wrap ? sel.length : 0);
     });
-  };
+  }, [content]);
 
-  const upload = async (file: File) => {
+  const uploadFile = useCallback(async (file: File): Promise<string | null> => {
     const fd = new FormData();
     fd.append("file", file);
-    setMsg("上传中…");
-    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
-    const d = await res.json().catch(() => ({}));
-    setMsg("");
-    if (res.ok) {
-      insert(`![](${d.url})\n`);
-    } else {
-      setErr(d.error || "上传失败");
+    setUploading((n) => n + 1);
+    try {
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(d.error || "上传失败"); return null; }
+      return d.url as string;
+    } finally {
+      setUploading((n) => n - 1);
     }
+  }, []);
+
+  const uploadAndInsert = useCallback(async (files: File[]) => {
+    setErr("");
+    const images = files.filter((f) => f.type.startsWith("image/"));
+    if (!images.length) return;
+    for (const f of images) {
+      const url = await uploadFile(f);
+      if (url) insert("![](" + url + ")\n");
+    }
+    setMsg("已插入 " + images.length + " 张图片");
+    setTimeout(() => setMsg(""), 2000);
+  }, [insert, uploadFile]);
+
+  const onPaste = async (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData?.files ?? []);
+    if (files.length) { e.preventDefault(); await uploadAndInsert(files); }
   };
 
-  const save = async (nextStatus?: string) => {
+  const onDrop = async (e: React.DragEvent) => {
+    e.preventDefault(); setDragOver(false);
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    if (files.length) await uploadAndInsert(files);
+  };
+
+  /* ---------------- 保存 ---------------- */
+  const save = useCallback(async (nextStatus?: string) => {
     const st = nextStatus || status;
     setBusy(true); setErr(""); setMsg("");
-    const payload = {
-      type, title, slug: slug || undefined, content,
+    const payload: Record<string, unknown> = {
+      type, title, slug: slug || undefined, content, cover,
       categories: cats.split(",").map((x) => x.trim()).filter(Boolean),
       tags: tags.split(",").map((x) => x.trim()).filter(Boolean),
       status: st,
     };
-    const url = mode === "new" ? "/api/admin/posts" : `/api/admin/posts/${initial?.id}`;
+    const url = mode === "new" ? "/api/admin/posts" : "/api/admin/posts/" + initial?.id;
     const res = await fetch(url, {
       method: mode === "new" ? "POST" : "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -84,35 +165,41 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
     if (res.ok) {
       setDirty(false);
       setStatus(st);
+      try { localStorage.removeItem(DRAFT_KEY(initial?.id)); } catch { /* ignore */ }
       setMsg(st === "published" ? "已发布" : "已保存为草稿");
       if (mode === "new" && d.id) {
-        router.push(`/admin/edit/${d.id}`);
+        router.push("/admin/edit/" + d.id);
         router.refresh();
       } else {
+        if (d.slug) setSlug(d.slug);
         router.refresh();
       }
     } else {
       setErr(d.error || "保存失败");
     }
-  };
+  }, [type, title, slug, content, cover, cats, tags, status, mode, initial?.id, router]);
 
-  const togglePreview = async () => {
-    if (!preview) {
-      const res = await fetch("/api/preview", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      const d = await res.json().catch(() => ({ html: "" }));
-      setPreviewHtml(d.html || "");
-      setPreview(true);
-    } else setPreview(false);
-  };
+  /* ---------------- 快捷键 ---------------- */
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      if (!meta) return;
+      if (e.key === "s") { e.preventDefault(); void save(); }
+      else if (e.key === "b" || e.key === "i") {
+        const ta = taRef.current;
+        if (document.activeElement === ta) { e.preventDefault(); insert(e.key === "b" ? "**" : "*", true); }
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [save, insert]);
 
   const isShuo = type === "shuoshuo";
+  const chars = content.replace(/\s/g, "").length;
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+    <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={onDrop}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <select className="input" value={type} onChange={(e) => { setType(e.target.value); mark(); }}
                 style={{ width: 110, padding: "6px 10px" }}>
           <option value="post">文章</option>
@@ -120,11 +207,29 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
           <option value="shuoshuo">说说</option>
         </select>
         <span style={{ flex: 1 }} />
-        <button className="btn btn-sm" onClick={togglePreview}>{preview ? "编辑" : "预览"}</button>
+        <span style={{ fontSize: ".74rem", color: "var(--text-p4)" }}>
+          {chars} 字{uploading ? " · 上传中 " + uploading : ""}
+        </span>
+        <button className="btn btn-sm" onClick={() => setSplit(!split)}>{split ? "单栏" : "分屏预览"}</button>
       </div>
 
       {msg ? <div className="notice notice-ok">{msg}</div> : null}
       {err ? <div className="notice notice-error">{err}</div> : null}
+
+      {restorable ? (
+        <div className="notice" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ flex: 1, fontSize: ".84rem" }}>
+            发现未保存的本地草稿（{new Date(restorable.at).toLocaleString("zh-CN")}）
+          </span>
+          <button className="btn btn-sm" onClick={() => {
+            setTitle(restorable.title); setContent(restorable.content); setDirty(true); setRestorable(null);
+          }}>恢复</button>
+          <button className="btn btn-sm" onClick={() => {
+            try { localStorage.removeItem(DRAFT_KEY(initial?.id)); } catch { /* ignore */ }
+            setRestorable(null);
+          }}>丢弃</button>
+        </div>
+      ) : null}
 
       {!isShuo ? (
         <div className="field">
@@ -136,7 +241,7 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
 
       {!isShuo && mode === "edit" ? (
         <div className="field">
-          <label>URL 路径</label>
+          <label>URL 路径（改动会自动为旧地址保留 301 跳转）</label>
           <input className="input" value={slug} onChange={(e) => { setSlug(e.target.value); mark(); }} />
         </div>
       ) : null}
@@ -151,36 +256,45 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
           { l: "H3", v: "### ", w: false },
           { l: "粗体", v: "**", w: true },
           { l: "斜体", v: "*", w: true },
-          { l: "代码", v: "`", w: true },
+          { l: "代码", v: "BT", w: true },
+          { l: "代码块", v: "\nBTBTBT\n", w: false },
           { l: "引用", v: "> ", w: false },
           { l: "列表", v: "- ", w: false },
           { l: "链接", v: "[文本](url)", w: false },
+          { l: "表格", v: "\n| 列1 | 列2 |\n| --- | --- |\n|   |   |\n", w: false },
           { l: "分隔线", v: "\n---\n", w: false },
         ].map((b) => (
-          <button key={b.l} type="button" className="btn btn-sm" onClick={() => insert(b.v, b.w)}
+          <button key={b.l} type="button" className="btn btn-sm"
+                  onClick={() => insert(b.v.split("BT").join(String.fromCharCode(96)), b.w)}
                   style={{ padding: "3px 9px", fontSize: ".78rem" }}>{b.l}</button>
         ))}
         <button type="button" className="btn btn-sm" onClick={() => fileRef.current?.click()}
                 style={{ padding: "3px 9px", fontSize: ".78rem" }}>图片</button>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
-               onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: "none" }}
+               onChange={(e) => { const fs2 = Array.from(e.target.files ?? []); if (fs2.length) void uploadAndInsert(fs2); e.target.value = ""; }} />
       </div>
 
-      {preview ? (
-        <div className="prose" style={{
-          minHeight: 320, padding: "16px 18px", border: "1px solid var(--border)",
-          borderRadius: 12, background: "var(--card-bg)",
-        }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
-      ) : (
+      <div style={{ display: "grid", gridTemplateColumns: split ? "1fr 1fr" : "1fr", gap: 12 }}>
         <textarea
           ref={taRef}
           className="textarea"
           value={content}
           onChange={(e) => { setContent(e.target.value); mark(); }}
-          placeholder={isShuo ? "写点什么…" : "支持 Markdown 语法，可直接粘贴图片"}
+          onPaste={onPaste}
+          placeholder={isShuo ? "写点什么…（可直接粘贴图片）" : "支持 Markdown，可直接粘贴或拖入图片"}
           style={{ minHeight: isShuo ? 140 : 420, fontFamily: "var(--font-mono)", fontSize: ".9rem", lineHeight: 1.7 }}
         />
-      )}
+        {split ? (
+          <div className="prose" style={{
+            minHeight: 420, maxHeight: 620, overflow: "auto", padding: "16px 18px",
+            border: "1px solid var(--border)", borderRadius: 12, background: "var(--card-bg)",
+          }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+        ) : null}
+      </div>
+
+      {dragOver ? (
+        <div className="notice" style={{ marginTop: 8 }}>松开即可上传图片</div>
+      ) : null}
 
       {!isShuo ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
@@ -195,12 +309,36 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
         </div>
       ) : null}
 
-      {/* 手机端底部固定操作栏 */}
+      {!isShuo ? (
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>封面图（可选，用于分享卡片 og:image）</label>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button type="button" className="btn btn-sm" onClick={() => coverRef.current?.click()}>选择图片</button>
+            <input ref={coverRef} type="file" accept="image/*" style={{ display: "none" }}
+                   onChange={async (e) => {
+                     const f = e.target.files?.[0];
+                     if (f) { const url = await uploadFile(f); if (url) { setCover(url); mark(); } }
+                     e.target.value = "";
+                   }} />
+            {cover ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={cover} alt="封面" style={{ height: 40, borderRadius: 6, border: "1px solid var(--border)" }} />
+                <button type="button" className="btn btn-sm" onClick={() => { setCover(null); mark(); }}>移除</button>
+              </>
+            ) : <span style={{ fontSize: ".78rem", color: "var(--text-p4)" }}>未设置</span>}
+          </div>
+        </div>
+      ) : null}
+
       <div style={{
         position: "sticky", bottom: 0, marginTop: 20, padding: "12px 0",
         background: "var(--bg-subtle)", borderTop: "1px solid var(--border)",
-        display: "flex", gap: 10, justifyContent: "flex-end",
+        display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center",
       }}>
+        <span style={{ flex: 1, fontSize: ".74rem", color: "var(--text-p4)" }}>
+          {dirty ? "有未保存改动 · Cmd/Ctrl+S 保存" : ""}
+        </span>
         <button className="btn" disabled={busy} onClick={() => save("draft")}>存草稿</button>
         <button className="btn btn-primary" disabled={busy} onClick={() => save("published")}>
           {busy ? "保存中…" : status === "published" ? "更新" : "发布"}

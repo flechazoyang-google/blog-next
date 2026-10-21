@@ -1,63 +1,44 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
-import { RightBar } from "@/components/RightBar";
-import { SearchBox } from "@/components/SearchBox";
-import { PostCard } from "@/components/PostCard";
-import { getDb } from "@/lib/db";
-import { makeExcerpt, parseJsonArray } from "@/lib/posts";
+import { searchPosts } from "@/lib/search";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "搜索" };
 
-export default async function SearchPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ q?: string }>;
-}) {
-  const { q = "" } = await searchParams;
-  const keyword = q.trim();
-
-  let results: any[] = [];
-  if (keyword) {
-    const db = getDb();
-    const like = "%" + keyword.replace(/[%_]/g, "") + "%";
-    results = db.prepare(
-      `SELECT * FROM posts
-       WHERE type='post' AND status='published'
-         AND (title LIKE ? OR content LIKE ?)
-       ORDER BY published_at DESC LIMIT 50`
-    ).all(like, like) as any[];
-  }
+export default async function SearchPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const sp = await searchParams;
+  const q = (sp.q ?? "").trim();
+  const { hits, mode } = q ? searchPosts(q, { limit: 30 }) : { hits: [], mode: "like" as const };
 
   return (
     <>
       <Animations />
       <div className="site-shell">
-        <Sidebar active="" />
+        <Sidebar active="/search" />
         <main className="content">
-          <SearchBox initial={keyword} />
-          {keyword ? (
-            <p style={{ fontSize: ".85rem", color: "var(--text-p4)", margin: "4px 0 20px" }}>
-              {results.length > 0
-                ? `找到 ${results.length} 篇与「${keyword}」相关的文章`
-                : `没有找到与「${keyword}」相关的文章`}
+          <h1 className="page-title">搜索</h1>
+          <form method="get" style={{ marginBottom: 20 }}>
+            <input className="input" name="q" defaultValue={q} placeholder="输入关键词（2 字以上即可）" />
+          </form>
+
+          {q ? (
+            <p style={{ fontSize: ".82rem", color: "var(--text-p4)", marginBottom: 16 }}>
+              {hits.length > 0 ? "找到 " + hits.length + " 篇" : "没有找到相关文章"}
+              {mode === "fts" ? " · 全文索引" : " · 关键词匹配"}
             </p>
           ) : null}
 
           <div className="post-list">
-            {results.map((p) => (
-              <PostCard
-                key={p.id}
-                href={`/${encodeURIComponent(p.slug)}`}
-                title={p.title}
-                excerpt={p.excerpt || makeExcerpt(p.content)}
-                date={p.published_at || p.created_at}
-                categories={parseJsonArray(p.categories)}
-              />
+            {hits.map((h) => (
+              <Link key={h.id} href={"/" + encodeURIComponent(h.slug)} className="post-card">
+                <h2>{h.title}</h2>
+                <p>{h.excerpt}</p>
+                <span className="date">{h.date}</span>
+              </Link>
             ))}
           </div>
         </main>
-        <div className="toc-col"><RightBar /></div>
       </div>
     </>
   );

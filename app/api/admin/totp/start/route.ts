@@ -1,15 +1,26 @@
-import { NextResponse } from "next/server";
-import { currentUser, createTotpSecret, totpUri } from "@/lib/auth";
-import { getDb } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin, requireStepUp, stepUpCodeFrom, handle, noStore } from "@/lib/guards";
+import { startTotpSetup } from "@/lib/auth";
+import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
-  const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+/**
+ * 生成待确认的 TOTP 密钥（A7）。
+ * 已启用时重新绑定属于敏感操作 -> 要求 step-up，防止会话劫持者换绑。
+ */
+export const POST = handle(async (req: NextRequest) => {
+  const ctx = await requireAdmin(req);
+  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
-  const secret = createTotpSecret();
-  // 暂存，确认后才置 enabled
-  getDb().prepare("UPDATE users SET totp_secret=? WHERE id=?").run(secret, user.id);
-  return NextResponse.json({ secret, uri: totpUri(secret, user.username) });
-}
+  if (ctx.user.totp_enabled) {
+    await requireStepUp(ctx, stepUpCodeFrom(req, body));
+  }
+
+  const { secret, uri } = startTotpSetup(ctx.user.id);
+  logAudit({
+    action: "totp.start", userId: ctx.user.id, userName: ctx.user.username,
+    meta: { rebind: !!ctx.user.totp_enabled }, ip: ctx.ip, userAgent: ctx.userAgent,
+  });
+  return noStore(NextResponse.json({ secret, uri }));
+});

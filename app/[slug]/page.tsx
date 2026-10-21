@@ -1,31 +1,53 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
 import { formatDate, toIso } from "@/components/PostCard";
-import { decodeSlug, getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt } from "@/lib/posts";
+import { decodeSlug, resolveSlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt, getPageBySlug } from "@/lib/posts";
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
 import { Lightbox } from "@/components/Lightbox";
 import { categoryColor } from "@/lib/category-color";
 import { RightBar } from "@/components/RightBar";
 import { getPageViews } from "@/lib/site-stats";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPostBySlug(slug) ?? getPageBySlug(slug);
-  if (!post) return {};
+  const { post, redirectTo } = resolveSlug(slug);
+  const doc = post ?? getPageBySlug(slug);
+  if (!doc || redirectTo) return {};
+  const desc = doc.excerpt || makeExcerpt(doc.content);
   return {
-    title: post.title,
-    description: post.excerpt || makeExcerpt(post.content),
+    title: doc.title,
+    description: desc,
+    openGraph: {
+      type: "article",
+      title: doc.title,
+      description: desc,
+      // C6：cover 字段此前 API 支持、前台完全不用 -> 分享出去没有卡片图
+      images: doc.cover ? [doc.cover] : undefined,
+    },
+    twitter: {
+      card: doc.cover ? "summary_large_image" : "summary",
+      title: doc.title,
+      description: desc,
+      images: doc.cover ? [doc.cover] : undefined,
+    },
   };
 }
 
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+
+  // B8：改过 slug 的旧地址 301 到新地址，收录不断链
+  const resolved = resolveSlug(slug);
+  if (resolved.redirectTo) redirect("/" + encodeURIComponent(resolved.redirectTo));
+
+  const post = resolved.post && resolved.post.type === "post" ? resolved.post : null;
   const page = post ? null : getPageBySlug(slug);
   const doc = post ?? page;
   if (!doc) notFound();
@@ -34,7 +56,8 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   const cats = parseJsonArray(doc.categories);
   const tags = parseJsonArray(doc.tags);
   const nav = post ? prevNextPost(doc.published_at || doc.created_at) : {};
-  const pageViews = await getPageViews("/" + decodeSlug(slug));
+  const pageViews = getPageViews("/" + decodeSlug(slug));
+  const settings = getSettings();
 
   return (
     <>
@@ -63,56 +86,35 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
                   {formatDate(doc.published_at || doc.created_at)}
                 </time>
                 <span className="dot">·</span>
-                <span>{readingTime(doc.content)} 分钟阅读</span>
-                <span className="dot">·</span>
-                <span>{doc.content.replace(/\s/g, "").length} 字</span>
+                <span>{readingTime(doc.content)} 分钟</span>
                 {pageViews !== null ? (
                   <>
                     <span className="dot">·</span>
-                    <span className="views-badge">
-                      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden>
-                        <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"
-                              fill="none" stroke="currentColor" strokeWidth="1.8" />
-                        <circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                      </svg>
-                      {pageViews.toLocaleString()} 次浏览
-                    </span>
+                    <span>{pageViews} 次浏览</span>
                   </>
                 ) : null}
               </div>
             </header>
 
-            <div className="prose" dangerouslySetInnerHTML={{ __html: html }} />
-
-            {tags.length > 0 ? (
-              <div className="tags">
-                {tags.map((t) => <span key={t} className="tag">#{t}</span>)}
-              </div>
+            {doc.cover ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={doc.cover} alt={doc.title}
+                   style={{ width: "100%", borderRadius: 12, marginBottom: 20, border: "1px solid var(--border)" }} />
             ) : null}
+
+            <div className="prose" dangerouslySetInnerHTML={{ __html: html }} />
           </article>
 
-          {post ? (
-            <nav className="post-nav">
-              {nav.prev ? (
-                <Link href={`/${encodeURIComponent(nav.prev.slug)}`}>
-                  <span className="label">上一篇</span>
-                  <span className="title">{nav.prev.title}</span>
-                </Link>
-              ) : <div />}
-              {nav.next ? (
-                <Link href={`/${encodeURIComponent(nav.next.slug)}`} className="next">
-                  <span className="label">下一篇</span>
-                  <span className="title">{nav.next.title}</span>
-                </Link>
-              ) : <div />}
+          {nav.prev || nav.next ? (
+            <nav className="article-nav" aria-label="上下篇">
+              {nav.prev ? <Link href={"/" + encodeURIComponent(nav.prev.slug)} className="btn btn-sm">← {nav.prev.title}</Link> : <span />}
+              {nav.next ? <Link href={"/" + encodeURIComponent(nav.next.slug)} className="btn btn-sm">{nav.next.title} →</Link> : null}
             </nav>
           ) : null}
 
-          {post ? <CommentSection postId={doc.id} /> : null}
+          {post && settings.commentEnabled ? <CommentSection postId={doc.id} /> : null}
         </main>
-        <div className="toc-col">
-          <RightBar toc={toc} />
-        </div>
+        <div className="toc-col"><RightBar toc={toc} /></div>
       </div>
     </>
   );

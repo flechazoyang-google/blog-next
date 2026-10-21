@@ -4,28 +4,44 @@ import { ScrollReset } from "@/components/ScrollReset";
 import { MobileNav } from "@/components/MobileNav";
 import { Analytics } from "@/components/Analytics";
 import { PwaRegister } from "@/components/PwaRegister";
+import { getSettings } from "@/lib/settings";
 
-export const metadata: Metadata = {
-  title: { default: "flechazo's blog", template: "%s · flechazo" },
-  description: "记录 AI、开发与折腾的日常。",
-  metadataBase: new URL("https://blog.yghsite.cn"),
-  manifest: "/manifest.webmanifest",
-  applicationName: "flechazo's blog",
-  appleWebApp: {
-    capable: true,
-    title: "flechazo",
-    statusBarStyle: "default",
-  },
-  icons: {
-    icon: [
-      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-    ],
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
-  },
-  formatDetection: { telephone: false },
-};
+/**
+ * C4：站名/描述此前硬编码在这里，改一个字要重新构建。
+ * 现在从 settings 表读（进程内缓存，写即失效）。
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const s = getSettings();
+  return {
+    title: { default: s.siteTitle, template: "%s · " + s.author },
+    description: s.siteDescription,
+    metadataBase: new URL(process.env.SITE_URL || "https://blog.yghsite.cn"),
+    manifest: "/manifest.webmanifest",
+    applicationName: s.siteTitle,
+    openGraph: {
+      type: "website",
+      siteName: s.siteTitle,
+      title: s.siteTitle,
+      description: s.siteDescription,
+      locale: "zh_CN",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: s.siteTitle,
+      description: s.siteDescription,
+    },
+    appleWebApp: { capable: true, title: s.author, statusBarStyle: "default" },
+    icons: {
+      icon: [
+        { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+    },
+    formatDetection: { telephone: false },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#fffefc",

@@ -11,7 +11,13 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
   const user = await currentUser();
   if (!user) redirect("/admin/login");
   const { id } = await params;
-  const row = getDb().prepare("SELECT * FROM posts WHERE id=?").get(Number(id)) as any;
+  const numId = Number(id);
+  if (!Number.isInteger(numId) || numId <= 0) notFound();
+
+  const row = getDb().prepare("SELECT * FROM posts WHERE id = ?").get(numId) as
+    | { id: number; type: string; title: string; slug: string; content: string; status: string;
+        categories: string; tags: string; cover: string | null; published_at: string | null }
+    | undefined;
   if (!row) notFound();
 
   return (
@@ -23,9 +29,9 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
         mode="edit"
         initial={{
           id: row.id, type: row.type, title: row.title, slug: row.slug,
-          content: row.content, status: row.status,
+          content: row.content, status: row.status, cover: row.cover,
           categories: parseJsonArray(row.categories), tags: parseJsonArray(row.tags),
-          published_at: row.published_at,
+          published_at: row.published_at ?? null,
         }}
       />
     </AdminShell>

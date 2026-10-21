@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type C = { id: number; author: string; url: string; content: string; created_at: string };
+type C = { id: number; author: string; url: string; content: string; created_at: string; parent_id: number | null };
 
 export function CommentSection({ postId }: { postId: number }) {
   const [comments, setComments] = useState<C[]>([]);

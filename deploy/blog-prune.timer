@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly prune for blog SQLite
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Unit=blog-prune.service
+
+[Install]
+WantedBy=timers.target

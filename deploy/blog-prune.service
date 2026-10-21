@@ -1,0 +1,9 @@
+[Unit]
+Description=Prune expired sessions / rate limits / old audit rows
+
+[Service]
+Type=oneshot
+User=blog
+Group=blog
+Environment=DATA_DIR=/var/lib/blog
+ExecStart=/usr/bin/node /opt/blog/scripts/prune.mjs

@@ -5,7 +5,7 @@ type Toc = { level: number; text: string; id: string }[];
 
 /** 桌面端右侧栏：站点统计 + 标签云（文章页还会在上面显示目录） */
 export async function RightBar({ toc }: { toc?: Toc }) {
-  const stats = await getSiteStats();
+  const stats = getSiteStats();
   const tags = getTagCloud(14);
 
   return (

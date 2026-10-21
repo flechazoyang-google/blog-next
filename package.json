@@ -7,8 +7,14 @@
     "build": "next build",
     "start": "node .next/standalone/server.js",
     "lint": "next lint",
+    "test": "node --experimental-strip-types --import=./tests/register.mjs --test tests/*.test.ts",
+    "verify": "bash scripts/verify.sh",
     "db:init": "node scripts/init-db.mjs",
-    "db:migrate-wp": "node scripts/migrate-wp.mjs"
+    "db:migrate-wp": "node scripts/migrate-wp.mjs",
+    "db:fix-dates": "node scripts/fix-dates.mjs",
+    "db:prune": "node scripts/prune.mjs",
+    "umami:sync": "node scripts/sync-umami.mjs",
+    "build:dist": "node scripts/package-standalone.mjs"
   },
   "dependencies": {
     "next": "^16.0.0",

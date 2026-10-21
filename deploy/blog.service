@@ -2,30 +2,49 @@
 Description=flechazo blog (Next.js SSR)
 After=network-online.target
 Wants=network-online.target
+# 迁移前的 .backup 由 scripts/deploy.sh 负责，这里只管运行
 
 [Service]
 Type=simple
-User=root
+# C14：原先 User=root —— 应用有文件写入能力（上传）且渲染任意 HTML，
+# root 会把提权半径放大到整机。改为专用用户（见 deploy/README 的安装步骤）。
+User=blog
+Group=blog
 WorkingDirectory=/opt/blog
 Environment=NODE_ENV=production
 Environment=PORT=8090
 Environment=HOSTNAME=127.0.0.1
 Environment=DATA_DIR=/var/lib/blog
 Environment=UPLOAD_DIR=/var/www/blog-images
+# 时区：展示层用 Intl 指定 Asia/Shanghai，这里固定 UTC 让日志与库内时间一致
+Environment=TZ=UTC
 ExecStart=/usr/bin/node server.js
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=5
 
-# 内存硬上限：实测占用约 105MB，留足余量防止内存泄漏拖垮整机
+# 内存硬上限：实测约 58MB，留足余量；P4 之后 SSR 开销进一步下降
 MemoryHigh=300M
 MemoryMax=400M
 MemorySwapMax=200M
 
-# 基础加固
+# OOM 时不要整机连坐；重启由 Restart= 负责
+OOMPolicy=continue
+
+# 加固
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=full
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=65536
 ReadWritePaths=/var/lib/blog /var/www/blog-images
 
 [Install]

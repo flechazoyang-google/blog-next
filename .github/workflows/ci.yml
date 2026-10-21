@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: node node_modules/typescript/bin/tsc --noEmit
+
+      - name: 单元与集成测试
+        run: npm test
+
+      - name: FTS5 冒烟（方案 §5 风险 1：Linux 侧产物是否支持 trigram）
+        run: |
+          node -e "
+          const D=require('better-sqlite3');
+          const db=new D(':memory:');
+          db.exec(\"CREATE VIRTUAL TABLE t USING fts5(x, tokenize='trigram')\");
+          db.prepare('INSERT INTO t VALUES (?)').run('霍夫变换底层原理');
+          const n=db.prepare('SELECT count(*) c FROM t WHERE t MATCH ?').get('\"霍夫变换\"').c;
+          if (n !== 1) { console.error('FTS5 trigram 不可用'); process.exit(1); }
+          console.log('FTS5 + trigram OK');
+          "
+
+      - name: 构建
+        run: npm run build

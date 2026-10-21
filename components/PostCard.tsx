@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatIn, toUtcIso } from "@/lib/time";
 import { categoryColor } from "@/lib/category-color";
 
 type Props = {
@@ -45,13 +46,15 @@ export function PostCard({ href, title, excerpt, date, categories = [], readingT
   );
 }
 
+/**
+ * B1：原实现 new Date("2026-10-20 18:00:00") 按**本地时区**解析，
+ * 而库里存的是 UTC，导致 02:00 CST 发布的文章显示成前一天。
+ * 现在统一走 lib/time.ts：先归一为带 Z 的 UTC，再按展示时区格式化。
+ */
 export function toIso(d: string): string {
-  const t = new Date(d);
-  return isNaN(t.getTime()) ? d : t.toISOString();
+  return toUtcIso(d) ?? d;
 }
 
 export function formatDate(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  return formatIn(iso, "date");
 }

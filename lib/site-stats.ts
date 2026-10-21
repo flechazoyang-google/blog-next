@@ -1,107 +1,41 @@
-import { getDb } from "./db";
+import { getDb, ftsAvailable } from "./db";
+import { getSettings } from "./settings";
+import { dateKeyIn } from "./time";
 
 export type Stat = { label: string; value: string; icon: string };
 
-/** 从 Umami 读取总访问量；未配置或失败时返回 null */
-async function getUmamiViews(): Promise<number | null> {
-  const base = process.env.UMAMI_API_URL;      // 例如 http://127.0.0.1:3000
-  const websiteId = process.env.UMAMI_WEBSITE_ID;
-  const token = process.env.UMAMI_TOKEN;       // Umami 后台生成的 API Token
-  if (!base || !websiteId || !token) return null;
-
-  try {
-    const end = Date.now();
-    const start = end - 365 * 86400000;
-    const res = await fetch(
-      `${base}/api/websites/${websiteId}/stats?startAt=${start}&endAt=${end}`,
-      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    // Umami v2 返回 { pageviews: 数字 }，v1 返回 { pageviews: { value } }
-    const pv = data?.pageviews;
-    const n = typeof pv === "number" ? pv : pv?.value;
-    return typeof n === "number" ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 读取单篇文章的访问量；未配置时返回 null */
-export async function getPageViews(pagePath: string): Promise<number | null> {
-  const apiBase = process.env.UMAMI_API_URL;
-  const websiteId = process.env.UMAMI_WEBSITE_ID;
-  const token = process.env.UMAMI_TOKEN;
-  if (!apiBase || !websiteId || !token) return null;
-
-  try {
-    const end = Date.now();
-    const start = end - 365 * 86400000;
-    const url =
-      `${apiBase}/api/websites/${websiteId}/stats?startAt=${start}&endAt=${end}&path=${encodeURIComponent(pagePath)}`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const pv = data?.pageviews;
-    const n = typeof pv === "number" ? pv : pv?.value;
-    return typeof n === "number" ? n : null;
-  } catch {
-    return null;
-  }
-}
-
-/** 批量获取所有路径的浏览量，返回 Map<path, views> */
-export async function getViewsMap(): Promise<Map<string, number>> {
-  const apiBase = process.env.UMAMI_API_URL;
-  const websiteId = process.env.UMAMI_WEBSITE_ID;
-  const token = process.env.UMAMI_TOKEN;
-  if (!apiBase || !websiteId || !token) return new Map();
-
-  try {
-    const end = Date.now();
-    const start = end - 365 * 86400000;
-    const res = await fetch(
-      `${apiBase}/api/websites/${websiteId}/metrics?startAt=${start}&endAt=${end}&type=path&limit=500`,
-      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
-    );
-    if (!res.ok) return new Map();
-    const rows = (await res.json()) as { x: string; y: number }[];
-    const map = new Map<string, number>();
-    for (const r of rows) map.set(r.x, r.y);
-    return map;
-  } catch {
-    return new Map();
-  }
-}
-
-/** 站点统计（异步，以便读取 Umami） */
-export async function getSiteStats(): Promise<Stat[]> {
+/**
+ * 站点统计（方案 C11）。
+ *
+ * 原实现：文章页 SSR 期间**同步 await 一次外部 HTTP**（Umami），
+ * 而 Umami 是这台机上最不稳定的邻居（Docker，实测 344MB）。
+ * 它一慢，文章页就慢；它一挂，文章页就 500。
+ *
+ * 现在：Umami 的数值由 systemd timer 定时拉取后写回 settings（scripts/sync-umami.mjs），
+ * 渲染路径只读本地 SQLite —— 统计服务抖动最多让数字变旧，不再影响可达性。
+ */
+export function getSiteStats(): Stat[] {
   const db = getDb();
   const c = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
 
-  const posts = c("SELECT COUNT(*) c FROM posts WHERE type='post' AND status='published'");
-  const shuo = c("SELECT COUNT(*) c FROM posts WHERE type='shuoshuo' AND status='published'");
-  const comments = c("SELECT COUNT(*) c FROM comments WHERE status='approved'");
+  const posts = c("SELECT COUNT(*) c FROM posts WHERE type = 'post' AND status = 'published' AND deleted_at IS NULL");
+  const shuo = c("SELECT COUNT(*) c FROM posts WHERE type = 'shuoshuo' AND status = 'published' AND deleted_at IS NULL");
+  const comments = c("SELECT COUNT(*) c FROM comments WHERE status = 'approved'");
 
   const first = db.prepare(
-    "SELECT MIN(published_at) m FROM posts WHERE type='post' AND status='published'"
+    "SELECT MIN(published_at) m FROM posts WHERE type = 'post' AND status = 'published' AND deleted_at IS NULL"
   ).get() as { m: string | null };
   let days = 0;
   if (first?.m) {
-    const start = new Date(first.m.replace(" ", "T")).getTime();
+    const start = new Date(first.m).getTime();
     if (!isNaN(start)) days = Math.max(1, Math.floor((Date.now() - start) / 86400000));
   }
 
-  // 优先用 Umami 真实数据；未配置时显示 "—"
-  const views = await getUmamiViews();
-  const viewsText =
-    views === null ? "—"
-    : views >= 10000 ? (views / 10000).toFixed(1) + "w"
-    : String(views);
+  const s = getSettings();
+  const views = s.umamiTotal ? Number(s.umamiTotal) : NaN;
+  const viewsText = Number.isFinite(views)
+    ? views >= 10000 ? (views / 10000).toFixed(1) + "w" : String(views)
+    : "—";
 
   return [
     { label: "文章", value: String(posts), icon: "📝" },
@@ -112,21 +46,52 @@ export async function getSiteStats(): Promise<Stat[]> {
   ];
 }
 
+/** 单篇浏览量：读本地缓存（键 umami:path:<slug>），未同步过则为 null */
+export function getPageViews(pagePath: string): number | null {
+  const raw = getSettingsRaw("umami:path:" + pagePath);
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getSettingsRaw(key: string): string | null {
+  const row = getDb().prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+/** 首页批量取浏览量：一次查询拿全，避免 N+1 */
+export function getViewsMap(): Map<string, number> {
+  const rows = getDb()
+    .prepare("SELECT key, value FROM settings WHERE key LIKE 'umami:path:%'")
+    .all() as { key: string; value: string }[];
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    const n = Number(r.value);
+    if (Number.isFinite(n)) map.set(r.key.slice("umami:path:".length), n);
+  }
+  return map;
+}
+
 export type TagItem = { name: string; count: number; size: number };
 
 /** 标签云：按出现次数映射字号（0.72 ~ 1.0 rem） */
 export function getTagCloud(limit = 18): TagItem[] {
   const db = getDb();
   const rows = db.prepare(
-    "SELECT tags FROM posts WHERE type='post' AND status='published'"
+    "SELECT tags FROM posts WHERE type = 'post' AND status = 'published' AND deleted_at IS NULL"
   ).all() as { tags: string }[];
 
   const counter = new Map<string, number>();
   for (const r of rows) {
     let arr: string[] = [];
-    try { arr = JSON.parse(r.tags || "[]"); } catch {}
+    try {
+      const v = JSON.parse(r.tags || "[]");
+      if (Array.isArray(v)) arr = v.map(String);
+    } catch {
+      // 脏数据跳过，不让标签云整块消失
+    }
     for (const t of arr) {
-      const name = String(t).trim();
+      const name = t.trim();
       if (!name) continue;
       counter.set(name, (counter.get(name) || 0) + 1);
     }
@@ -136,3 +101,9 @@ export function getTagCloud(limit = 18): TagItem[] {
   const max = list[0]?.[1] || 1;
   return list.map(([name, count]) => ({ name, count, size: 0.72 + (count / max) * 0.28 }));
 }
+
+export function searchReady(): boolean {
+  return ftsAvailable();
+}
+
+export { dateKeyIn };

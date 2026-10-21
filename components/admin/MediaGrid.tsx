@@ -1,0 +1,102 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+type Item = {
+  id: number; path: string; filename: string; mime: string; size: number;
+  created_at: string; width: number | null; height: number | null; refs: number;
+};
+
+export function MediaGrid({ items }: { items: Item[] }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [orphans, setOrphans] = useState<string[] | null>(null);
+
+  const copy = async (p: string) => {
+    try {
+      await navigator.clipboard.writeText("![](" + p + ")");
+      setMsg("已复制 Markdown 引用：" + p);
+      setTimeout(() => setMsg(""), 2000);
+    } catch {
+      setErr("复制失败，请手动选取");
+    }
+  };
+
+  const remove = async (item: Item) => {
+    setMsg(""); setErr(""); setBusy(true);
+    const res = await fetch("/api/admin/media/" + item.id, { method: "DELETE" });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (res.ok) { setMsg("已删除"); router.refresh(); }
+    else setErr(d.error || "删除失败");
+  };
+
+  const scan = async () => {
+    setMsg(""); setErr(""); setBusy(true);
+    const res = await fetch("/api/admin/media", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "scan-orphans" }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (res.ok) {
+      setOrphans(d.orphans || []);
+      setMsg("磁盘 " + d.onDisk + " 个文件 / 库内 " + d.inDb + " 条 / 孤儿 " + d.orphanCount + " 个");
+    } else setErr(d.error || "扫描失败");
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <button className="btn btn-sm" onClick={scan} disabled={busy}>扫描孤儿文件</button>
+      </div>
+
+      {msg ? <div className="notice notice-ok">{msg}</div> : null}
+      {err ? <div className="notice notice-error">{err}</div> : null}
+
+      {orphans && orphans.length ? (
+        <section style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 18, background: "var(--card-bg)" }}>
+          <div style={{ fontSize: ".85rem", color: "var(--text-p2)", marginBottom: 8 }}>
+            以下文件在磁盘上但不在 media 表里（多为历史上传，未自动删除）：
+          </div>
+          <div style={{ fontFamily: "var(--font-mono)", fontSize: ".74rem", color: "var(--text-p3)", maxHeight: 160, overflow: "auto" }}>
+            {orphans.map((o) => <div key={o}>{o}</div>)}
+          </div>
+        </section>
+      ) : null}
+
+      {items.length === 0 ? <div className="empty">还没有图片</div> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(150px,1fr))", gap: 12 }}>
+          {items.map((m) => (
+            <figure key={m.id} style={{
+              margin: 0, border: "1px solid var(--border)", borderRadius: 12,
+              overflow: "hidden", background: "var(--card-bg)",
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={m.path} alt={m.filename} loading="lazy"
+                   style={{ width: "100%", height: 110, objectFit: "cover", display: "block" }} />
+              <figcaption style={{ padding: "8px 10px" }}>
+                <div style={{ fontSize: ".72rem", color: "var(--text-p3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {m.filename}
+                </div>
+                <div style={{ fontSize: ".68rem", color: "var(--text-p4)", margin: "2px 0 8px" }}>
+                  {(m.size / 1024).toFixed(0)} KB{m.width ? " · " + m.width + "×" + m.height : ""}
+                  {" · "}{m.refs > 0 ? "引用 " + m.refs : "未引用"}
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button className="btn btn-sm" style={{ padding: "2px 8px", fontSize: ".72rem" }} onClick={() => copy(m.path)}>复制</button>
+                  <button className="btn btn-sm" disabled={busy || m.refs > 0}
+                          title={m.refs > 0 ? "仍被文章引用，不能删除" : "删除"}
+                          style={{ padding: "2px 8px", fontSize: ".72rem", opacity: m.refs > 0 ? .45 : 1 }}
+                          onClick={() => remove(m)}>删除</button>
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}

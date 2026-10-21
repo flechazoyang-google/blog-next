@@ -47,4 +47,42 @@ copyDir(path.join(ROOT, "scripts"), path.join(OUT, "scripts"));
 if (fs.existsSync(path.join(ROOT, "content"))) copyDir(path.join(ROOT, "content"), path.join(OUT, "content"));
 if (fs.existsSync(path.join(ROOT, "deploy"))) copyDir(path.join(ROOT, "deploy"), path.join(OUT, "deploy"));
 
+/**
+ * C3：standalone 只追踪 Next 自己能静态分析的依赖。
+ * bcryptjs / otpauth / marked / gray-matter 这类通过运行时 require 或动态路径引入的
+ * 依赖不会被 trace 进来 —— 这正是 README 要求「在服务器上 npm install --no-save」
+ * 的原因，而那个步骤一旦漏掉就是 500。
+ *
+ * 这里把 package.json 的 dependencies 全部从本地 node_modules 补进产物，
+ * 让部署不再需要服务器联网装包。
+ */
+function copyRuntimeDeps() {
+  const pkgPath = path.join(ROOT, "package.json");
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+  const deps = Object.keys(pkg.dependencies || {});
+  const src = path.join(ROOT, "node_modules");
+  const dst = path.join(OUT, "node_modules");
+  let copied = 0;
+  const missing = [];
+
+  // 递归收集依赖的依赖，避免只拷一级导致运行时缺包
+  const seen = new Set();
+  function walk(name) {
+    if (seen.has(name)) return;
+    seen.add(name);
+    const from = path.join(src, name);
+    if (!fs.existsSync(from)) { missing.push(name); return; }
+    const to = path.join(dst, name);
+    if (!fs.existsSync(to)) { copyDir(from, to); copied++; }
+    let meta;
+    try { meta = JSON.parse(fs.readFileSync(path.join(from, "package.json"), "utf8")); } catch { return; }
+    for (const dep of Object.keys(meta.dependencies || {})) walk(dep);
+    for (const dep of Object.keys(meta.optionalDependencies || {})) walk(dep);
+  }
+  for (const d of deps) walk(d);
+  if (missing.length) console.warn("!! 缺少依赖（未安装）：", missing.join(", "));
+  console.log("运行时依赖已补入产物：", copied, "个包");
+}
+
+copyRuntimeDeps();
 console.log("dist ready:", OUT);

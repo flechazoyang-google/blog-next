@@ -14,7 +14,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page || "1", 10) || 1);
   const posts = listPosts({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
-  const viewsMap = await getViewsMap();
+  const viewsMap = getViewsMap();
   const total = countPosts();
 
   return (
