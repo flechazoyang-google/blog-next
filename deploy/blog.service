@@ -1,38 +1,32 @@
 [Unit]
-Description=flechazo blog (Next.js)
-Documentation=https://blog.yghsite.cn
+Description=flechazo blog (Next.js SSR)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=blog
-Group=blog
+User=root
 WorkingDirectory=/opt/blog
 Environment=NODE_ENV=production
 Environment=PORT=8090
 Environment=HOSTNAME=127.0.0.1
 Environment=DATA_DIR=/var/lib/blog
-Environment=UPLOAD_DIR=/var/lib/blog/images
+Environment=UPLOAD_DIR=/var/www/blog-images
 ExecStart=/usr/bin/node server.js
-Restart=on-failure
+Restart=always
 RestartSec=5
 
-# 内存硬上限（依据：Next.js SSR 实测 180~250MB）
-MemoryHigh=280M
-MemoryMax=350M
+# 内存硬上限：实测占用约 105MB，留足余量防止内存泄漏拖垮整机
+MemoryHigh=300M
+MemoryMax=400M
+MemorySwapMax=200M
 
 # 基础加固
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/var/lib/blog
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-LockPersonality=true
+ReadWritePaths=/var/lib/blog /var/www/blog-images
 
 [Install]
 WantedBy=multi-user.target

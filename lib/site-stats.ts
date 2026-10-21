@@ -2,12 +2,33 @@ import { getDb } from "./db";
 
 export type Stat = { label: string; value: string; icon: string };
 
-/**
- * 站点统计。
- * Umami 尚未部署，访问量先用虚拟值占位（UMAMI_ENABLED=false 时）。
- * 部署后把 UMAMI_ENABLED 置为 true，并在此接入 Umami API。
- */
-export function getSiteStats(): Stat[] {
+/** 从 Umami 读取总访问量；未配置或失败时返回 null */
+async function getUmamiViews(): Promise<number | null> {
+  const base = process.env.UMAMI_API_URL;      // 例如 http://127.0.0.1:3000
+  const websiteId = process.env.UMAMI_WEBSITE_ID;
+  const token = process.env.UMAMI_TOKEN;       // Umami 后台生成的 API Token
+  if (!base || !websiteId || !token) return null;
+
+  try {
+    const end = Date.now();
+    const start = end - 365 * 86400000;
+    const res = await fetch(
+      `${base}/api/websites/${websiteId}/stats?startAt=${start}&endAt=${end}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    // Umami v2 返回 { pageviews: 数字 }，v1 返回 { pageviews: { value } }
+    const pv = data?.pageviews;
+    const n = typeof pv === "number" ? pv : pv?.value;
+    return typeof n === "number" ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 站点统计（异步，以便读取 Umami） */
+export async function getSiteStats(): Promise<Stat[]> {
   const db = getDb();
   const c = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
 
@@ -15,7 +36,6 @@ export function getSiteStats(): Stat[] {
   const shuo = c("SELECT COUNT(*) c FROM posts WHERE type='shuoshuo' AND status='published'");
   const comments = c("SELECT COUNT(*) c FROM comments WHERE status='approved'");
 
-  // 站点运行天数：从最早一篇文章算起
   const first = db.prepare(
     "SELECT MIN(published_at) m FROM posts WHERE type='post' AND status='published'"
   ).get() as { m: string | null };
@@ -25,15 +45,19 @@ export function getSiteStats(): Stat[] {
     if (!isNaN(start)) days = Math.max(1, Math.floor((Date.now() - start) / 86400000));
   }
 
-  // TODO: Umami 部署后替换为真实数据
-  const views = 12800 + posts * 73;
+  // 优先用 Umami 真实数据；未配置时显示 "—"
+  const views = await getUmamiViews();
+  const viewsText =
+    views === null ? "—"
+    : views >= 10000 ? (views / 10000).toFixed(1) + "w"
+    : String(views);
 
   return [
     { label: "文章", value: String(posts), icon: "📝" },
     { label: "说说", value: String(shuo), icon: "💬" },
     { label: "评论", value: String(comments), icon: "🗨" },
     { label: "运行", value: days + "天", icon: "⏳" },
-    { label: "访问", value: views >= 10000 ? (views / 10000).toFixed(1) + "w" : String(views), icon: "👁" },
+    { label: "访问", value: viewsText, icon: "👁" },
   ];
 }
 
@@ -57,14 +81,7 @@ export function getTagCloud(limit = 18): TagItem[] {
     }
   }
 
-  const list = [...counter.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit);
-
+  const list = [...counter.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
   const max = list[0]?.[1] || 1;
-  return list.map(([name, count]) => ({
-    name,
-    count,
-    size: 0.72 + (count / max) * 0.28,
-  }));
+  return list.map(([name, count]) => ({ name, count, size: 0.72 + (count / max) * 0.28 }));
 }

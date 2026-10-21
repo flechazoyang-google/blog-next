@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ScrollReset } from "@/components/ScrollReset";
 import { MobileNav } from "@/components/MobileNav";
+import { Analytics } from "@/components/Analytics";
 
 export const metadata: Metadata = {
   title: { default: "flechazo's blog", template: "%s · flechazo" },
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ScrollReset />
         <MobileNav />
         {children}
+        <Analytics />
       </body>
     </html>
   );

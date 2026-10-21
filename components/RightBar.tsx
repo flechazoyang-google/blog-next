@@ -4,8 +4,8 @@ import { getSiteStats, getTagCloud } from "@/lib/site-stats";
 type Toc = { level: number; text: string; id: string }[];
 
 /** 桌面端右侧栏：站点统计 + 标签云（文章页还会在上面显示目录） */
-export function RightBar({ toc }: { toc?: Toc }) {
-  const stats = getSiteStats();
+export async function RightBar({ toc }: { toc?: Toc }) {
+  const stats = await getSiteStats();
   const tags = getTagCloud(14);
 
   return (
