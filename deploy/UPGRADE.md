@@ -732,3 +732,81 @@ Artalk 的 `limit` 默认是 0，不是"不限"。用 curl 验证时必须带上
 curl -skI https://artalk.yghsite.cn/sidebar/ | grep -iE "x-frame|frame-ancestors"
 # 期望：只有 content-security-policy: frame-ancestors ...，没有 x-frame-options
 ```
+
+### 13.13 邮件通知不生效（2026-10-22 00:2x）
+
+现象：新评论进来了，但收不到邮件提醒。
+
+**根因：缺少 `admin_notify` 配置段。**
+
+这是最容易漏的一点 —— 有 `email:`（SMTP 账号）**不等于**会发通知。
+Artalk 把这两件事分开了：
+
+| 配置段 | 作用 |
+|---|---|
+| `email:` | SMTP 发信能力（host / port / 账号 / 授权码） |
+| **`admin_notify:`** | **要不要给管理员发通知**（总开关） |
+| `moderator.notify_pending` | 待审评论要不要也通知 |
+
+只配了 `email:` 时，SMTP 是通的，但没有任何事件去触发它 ——
+所以 `notifies` 表里连记录都不会生成（这一点很关键：不是"发送失败"，是"根本没触发"）。
+
+**正确配置：**
+
+```yaml
+# 1) SMTP 发信能力
+email:
+  enabled: true
+  send_type: smtp
+  send_name: flechazo（管理员）
+  send_addr: your-name@example.com
+  mail_subject: 博客评论
+  smtp:
+    host: smtp.qq.com
+    port: 465
+    username: your-name@example.com
+    password: <QQ邮箱授权码，16位>
+
+# 2) 管理员通知（缺这段就完全不发）
+admin_notify:
+  notify_tpl: default
+  notify_pending: true      # 待审评论也通知
+  noise_mode: false         # false = 只在发给管理员的消息上通知
+  email:
+    enabled: true
+    mail_subject: "[{{site_name}}] {{page_title}} 有新评论"
+
+# 3) 评论先审后发时的配套开关
+moderator:
+  pending_default: true
+  notify_pending: true
+```
+
+**验证方法（看 `is_emailed`，不要靠猜）：**
+
+```bash
+# 发一条评论后：
+sqlite3 /opt/artalk/data/artalk.db \
+  "select id,user_id,is_emailed,email_at from notifies;"
+# is_emailed=1 且 email_at 有值 -> 发送成功
+# is_emailed=0               -> 触发了但发送失败（查 SMTP）
+# 表是空的                 -> 根本没触发（查 admin_notify）
+```
+
+实测结果：加 `admin_notify` 后连续 2 条评论均 `is_emailed=1`，QQ 邮箱授权码可正常发信。
+
+> 注意：自己评论自己的文章**不会**触发通知（Artalk 不给评论者本人发）。
+> 测试时要用另一个昵称/邮箱发评论。
+
+### 13.14 已知遗留：IP 属地显示不了
+
+日志一直在报：
+
+```
+WARN [config/base.go:205] 未找到 IP 数据库文件："./data/ip2region.xdb"，IP 属地功能已禁用
+```
+
+需要把 `ip2region.xdb` 放到 `/opt/artalk/data/`。
+从 GitHub raw 下载会因为 LFS 只拿到指针文件（约 266KB，正常应约 11MB），
+应改用 release 附件或 `https://cdn.jsdelivr.net/npm/ip2region@...` 之类的直链。
+**不影响评论与邮件功能**，只是评论不显示"来自哪个省"。

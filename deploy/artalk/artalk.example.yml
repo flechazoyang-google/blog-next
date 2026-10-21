@@ -1,11 +1,8 @@
-# Artalk 配置模板
-# 用法：复制到 /opt/artalk/artalk.yml，并把 app_key 换成 openssl rand -hex 32
-# 完整坑位说明见 deploy/UPGRADE.md 第十三节
-
+# Artalk 评论系统配置（2026-10-21 部署）
 host: 0.0.0.0
 port: 23366
 
-# ⚠️ type 必须是 sqlite，写 sqlite3 会 panic: unsupported database type
+# 数据库：type 必须写 sqlite（写 sqlite3 会 panic）
 db:
   type: sqlite
   file: /data/artalk.db
@@ -14,39 +11,87 @@ cache:
   type: builtin
   expires: 60
 
-# 会话签名密钥（勿泄露、勿入库）
+# 会话签名密钥
 app_key: REPLACE_ME_with_openssl_rand_hex_32
 
-# ⚠️ 登录有效期（秒）。不配默认 0 -> JWT 的 exp == iat -> 登录后所有请求仍报未登录
-# 这是最容易卡住的一个，现象是"能登录成功但立刻掉线"
+# 登录有效期（秒）。不配则默认 0 -> JWT 的 exp == iat -> 登录后立刻失效
 login_timeout: 259200
 
 site_default: "flechazo blog"
 locale: zh-CN
 timezone: Asia/Shanghai
 
-# 跨域白名单：缺了博客域名会导致前端拿不到数据（不报错，只显示空白）
 trusted_domains:
   - "https://blog.yghsite.cn"
   - "https://artalk.yghsite.cn"
 
-# 反代：只信 nginx 的 X-Real-IP，防客户端伪造
+# 反代：只信 nginx 的 X-Real-IP
 http:
   proxy_header: X-Real-IP
 
-# 审核：新评论默认待审
-# ⚠️ 正确键名是 moderator.pending_default，写成顶层 moderator_pending 会被静默忽略
+# 审核：新评论默认待审（需要管理员在 /sidebar 通过）
+# 注意正确键名是 moderator.pending_default，不是 moderator_pending
 moderator:
   pending_default: true
   notify_pending: true
 
-# 登录认证：默认全部关闭，不开的话后台报 "Email auth is not enabled"
+# 登录认证（默认关闭，不开的话后台会报 "Email auth is not enabled"）
 auth:
   enabled: true
-  # 允许游客匿名评论（不开则必须登录，个人博客通常要开）
   anonymous: true
   callback: "https://artalk.yghsite.cn/api/v2/auth/{provider}/callback"
   email:
     enabled: true
     verify_subject: "登录验证码 - {{code}}"
     verify_tpl: default
+  github:
+    enabled: true
+  google:
+    enabled: true
+  steam:
+    enabled: true
+  wechat:
+    enabled: true
+ip_region:
+  enabled: true
+  precision: province
+img_upload:
+  enabled: true
+  path: /artalkImage
+email:
+  enabled: true
+  send_type: smtp
+  smtp:
+    host: smtp.qq.com
+    port: 465
+    username: your-name@example.com
+    password: fxrzjqcfadqtdfdf
+  mail_subject: 博客评论
+  send_addr: your-name@example.com
+  send_name: flechazo（管理员）
+frontend:
+  placeholder: 只言片语
+  noComment: 此时无声胜有声~
+  sendBtn: 发送
+  listSort: true
+  preview: true
+  pagination:
+    autoLoad: true
+    pageSize: 10
+    readMore: true
+  gravatar:
+    mirror: https://cravatar.cn/avatar/
+
+
+# 管理员通知（新评论推送给管理员）
+# 这是"有没有邮件通知"的总开关之一：没有这一段，评论进来了也不会触发任何推送
+admin_notify:
+  notify_tpl: default
+  # 待审评论也发通知（否则审核通过前你不会收到任何提醒）
+  notify_pending: true
+  # false = 只在"发给管理员"的消息上通知；true = 用户间回复也抄送管理员
+  noise_mode: false
+  email:
+    enabled: true
+    mail_subject: "[{{site_name}}] {{page_title}} 有新评论"
+    mail_tpl: ""
