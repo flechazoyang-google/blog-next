@@ -655,3 +655,52 @@ new 能否用: 否 - A is not a constructor
 `login_timeout` / `moderator.pending_default` / `auth.*` 都完整保留（diff 只多一个空行）。
 
 > 若担心误改，正确做法是**定期备份** `/opt/artalk/artalk.yml`，而不是只读挂载。
+
+### 13.11 评论"提交成功但前台不显示"的排查记录（2026-10-21 23:2x）
+
+排查中发现的两个**测试方法**问题，不是系统问题，但值得记下来：
+
+**① `limit` 不传会返回空数组**
+
+```
+/api/v2/comments?site_name=...&page_key=...          -> count=1, comments=[]   <- 空！
+/api/v2/comments?site_name=...&page_key=...&limit=50 -> count=1, comments=[...] <- 正常
+```
+
+Artalk 的 `limit` 默认是 0，不是"不限"。用 curl 验证时必须带上 `limit`，
+否则会误判成"评论没存进去"。**前端 Artalk.js 会自己传 limit，不受影响。**
+
+**② 反复 `delete from comments` 造成测试数据污染**
+
+我为了"清干净"多次删表重来，结果 page 记录与评论的关联被打乱，
+看到 `count=0`/`count=1` 各种矛盾结果，白白绕了好几轮。
+
+正确做法：一次完整走完"发评论 -> 读（应 0 条）-> 审核 -> 读（应 1 条）"，不要中途删表。
+
+**最终验证通过的完整链路**（清理所有测试数据后重做）：
+
+```
+1. 匿名发评论        -> is_pending=1
+2. 前台读取          -> count=0, comments=[]     (待审不可见 ✓)
+3. 管理员审核通过    -> is_pending=0
+4. 前台读取          -> count=1, comments=[{nick:"中文key", content:"中文page_key测试"}]  ✓
+```
+
+**③ 审核接口的正确调用方式**
+
+`PUT /api/v2/comments/{id}`，且参数是**必填全套**（不是只传要改的字段）：
+
+```json
+{
+  "site_name": "flechazo blog",   // 必填
+  "page_key":  "/文章slug",       // 必填
+  "content":   "原内容",          // 必填
+  "rid":       0,                 // 必填
+  "is_pending":   false,          // 必填
+  "is_collapsed": false,          // 必填
+  "is_pinned":    false           // 必填
+}
+```
+
+只传 `{"is_pending":false}` 会报 `Site_name必须填写`。
+（正常使用时不需要手工调这个接口，在 `/sidebar` 界面点「通过」即可。）
