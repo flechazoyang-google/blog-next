@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { Avatar } from "./Avatar";
 
-// primary: 手机端也显示；optional: 手机端收进底部那一行
 const NAV = [
-  { href: "/", label: "文章", primary: true },
-  { href: "/shuoshuo", label: "说说", primary: true },
-  { href: "/archives", label: "归档", primary: true },
-  { href: "/about", label: "关于", primary: false },
-  { href: "/friend-links", label: "友链", primary: false },
+  { href: "/", label: "文章" },
+  { href: "/shuoshuo", label: "说说" },
+  { href: "/archives", label: "归档" },
+  { href: "/friend-links", label: "友链" },
+  { href: "/about", label: "关于" },
 ];
 
+/** 桌面端左侧栏（手机端整块隐藏，改用 MobileNav 抽屉） */
 export function Sidebar({ active }: { active?: string }) {
   return (
     <aside className="sidebar">
@@ -22,18 +22,12 @@ export function Sidebar({ active }: { active?: string }) {
       </div>
       <nav className="nav">
         {NAV.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className={`${active === n.href ? "active" : ""} ${n.primary ? "" : "nav-optional"}`.trim()}
-          >
+          <Link key={n.href} href={n.href} className={active === n.href ? "active" : ""}>
             {n.label}
           </Link>
         ))}
       </nav>
       <div className="sidebar-footer">
-        <Link href="/about" className="only-mobile">关于</Link>
-        <Link href="/friend-links" className="only-mobile">友链</Link>
         <a href="/rss.xml">RSS</a>
         <a href="/admin" title="管理后台">管理</a>
       </div>
