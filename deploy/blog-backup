@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#
+# 博客备份：SQLite + 图片 -> 本地归档 -> 坚果云异地同步
+#
+# 与 Vaultwarden 备份的区别：博客不需要停机。
+# SQLite 用 .backup 命令做在线一致性快照（WAL 模式下也安全），
+# 所以这里不停 blog.service，也不影响线上访问。
+#
+# 用法：blog-backup [目标目录]
+# 定时：/etc/cron.d/blog-backup 每日 04:00
+set -euo pipefail
+
+DEST="${1:-/root/blog-backups}"
+DB=/var/lib/blog/blog.db
+IMGDIR=/var/www/blog-images
+REMOTE=jianguoyun:blog_backup
+KEEP=14
+STAMP=$(date +%Y%m%d-%H%M%S)
+
+mkdir -p "$DEST"; chmod 700 "$DEST"
+ARCHIVE="$DEST/blog-$STAMP.tar.gz"
+TMP=$(mktemp -d); chmod 700 "$TMP"
+trap 'rm -rf "$TMP"' EXIT
+
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*"; }
+
+log "开始备份"
+
+# 1. SQLite 在线快照（不停服务）
+if [ ! -f "$DB" ]; then
+  log "!! 数据库不存在：$DB"
+  exit 1
+fi
+sqlite3 "$DB" ".backup '$TMP/blog.db'"
+
+# 2. 完整性校验
+CHK=$(sqlite3 "$TMP/blog.db" 'PRAGMA integrity_check;')
+if [ "$CHK" != "ok" ]; then
+  log "!! integrity_check 失败：$CHK"
+  exit 1
+fi
+
+# 3. 业务数据自检（防止备份到空库）
+POSTS=$(sqlite3 "$TMP/blog.db" "SELECT COUNT(*) FROM posts WHERE type='post' AND status='published';")
+if [ "${POSTS:-0}" -lt 1 ]; then
+  log "!! posts 数量异常：${POSTS:-0}"
+  exit 1
+fi
+log "数据库 OK（已发布文章 $POSTS 篇）"
+
+# 4. 打包（数据库 + 图片 + 清单）
+mkdir -p "$TMP/images"
+if [ -d "$IMGDIR" ]; then
+  cp -a "$IMGDIR/." "$TMP/images/" 2>/dev/null || true
+fi
+cat > "$TMP/MANIFEST.txt" <<EOF
+备份时间: $(date '+%F %T %Z')
+数据库: blog.db（integrity_check=ok，已发布文章 $POSTS 篇）
+图片: $(find "$TMP/images" -type f 2>/dev/null | wc -l) 个文件
+来源: $DB + $IMGDIR
+EOF
+
+tar czf "$ARCHIVE" -C "$TMP" .
+chmod 600 "$ARCHIVE"
+log "归档完成：$ARCHIVE（$(du -h "$ARCHIVE" | cut -f1)）"
+
+# 5. 同步到坚果云
+#    坚果云要求父目录必须已存在，否则报 AncestorsNotFound(409)
+rclone mkdir "$REMOTE" 2>>/var/log/blog-backup.log || true
+if rclone copy "$ARCHIVE" "$REMOTE/" --no-traverse 2>>/var/log/blog-backup.log; then
+  log "已同步到坚果云 $REMOTE"
+else
+  log "!! 坚果云同步失败（本地备份仍在 $ARCHIVE）"
+fi
+
+# 6. 两边都只保留最近 $KEEP 份
+ls -1t "$DEST"/blog-*.tar.gz 2>/dev/null | tail -n +$((KEEP + 1)) | while read -r f; do
+  rm -f "$f"; log "清理本地旧备份：$(basename "$f")"
+done
+
+rclone lsf "$REMOTE/" --files-only 2>/dev/null | grep '^blog-.*\.tar\.gz$' | sort -r | \
+  tail -n +$((KEEP + 1)) | while read -r f; do
+    rclone deletefile "$REMOTE/$f" 2>/dev/null && log "清理远端旧备份：$f"
+  done
+
+log "备份结束"
