@@ -1,4 +1,4 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Sidebar } from "@/components/Sidebar";
@@ -43,9 +43,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function PostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
 
-  // B8：改过 slug 的旧地址 301 到新地址，收录不断链
+  // B8：改过 slug 的旧地址永久跳转到新地址，收录不断链。
+  //
+  // 用 permanentRedirect() 而不是 redirect()：
+  //   redirect()      -> 307 临时，搜索引擎不会把权重/索引转移到新地址，
+  //                      别名表就失去意义了
+  //   permanentRedirect() -> 308 永久（等价 301 的语义，且保留请求方法）
+  // 注：Server Component 里无法直接返回 301，308 是 Next 提供的最接近的永久跳转。
   const resolved = resolveSlug(slug);
-  if (resolved.redirectTo) redirect("/" + encodeURIComponent(resolved.redirectTo));
+  if (resolved.redirectTo) permanentRedirect("/" + encodeURIComponent(resolved.redirectTo));
 
   const post = resolved.post && resolved.post.type === "post" ? resolved.post : null;
   const page = post ? null : getPageBySlug(slug);
