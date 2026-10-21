@@ -256,3 +256,64 @@ node scripts/unlock.mjs --ip 1.2.3.4
 
 **做接口测试时请注意**：验证限流请用不存在的用户名（例如 `nonexistent-test-user`），
 同样能验证逻辑，又不会锁到真实账号。
+
+
+---
+
+## 九、统计脚本（Umami）的两个修复
+
+### 9.1 控制台那条 preload 警告
+
+```
+The resource https://umami.yghsite.cn/script.js was preloaded using link preload
+but not used within a few seconds from the window's load event
+```
+
+**根因**：`next/script` 在 `afterInteractive` 策略下，服务端只输出
+`<link rel="preload">`，真正的 `<script>` 由客户端 `useEffect` 在 hydration
+之后才插入。对跨域脚本来说，这就产生了「预加载了、但几秒内没被使用」的告警。
+
+**这不只是噪音**：统计要等 hydration 完成才开始上报，首屏快速跳出的访问会被漏掉。
+
+**已改为原生 `<script defer>`**：服务端直出执行标签，没有 preload/执行 的时间差，
+告警消失，且 `defer` 同样不阻塞解析。
+
+### 9.2 一个会真让统计失效的 bug（我自己引入的）
+
+CSP 里 `script-src` 与 `connect-src` 原本**没有** `umami.yghsite.cn`：
+
+```
+script-src 'self' 'unsafe-inline'     <- 少了 umami
+connect-src 'self'                    <- 少了 umami
+```
+
+原因：`next.config.ts` 在**构建期**求值，而 `NEXT_PUBLIC_UMAMI_SRC` 是 systemd
+在**运行期**注入的 —— 构建机上没有这个变量，`umamiOrigin` 算出来是空串。
+
+现在还是 Report-Only 所以没真拦，但**一旦按计划切成 `CSP_MODE=enforce`，
+统计上报会被 CSP 直接拦掉，而且不会有明显报错**。
+
+**已修**：给 `UMAMI_SRC` 一个默认值兜底，并支持 `CSP_EXTRA_ORIGINS` 追加额外源。
+线上实测：
+
+```
+script-src 'self' 'unsafe-inline' https://umami.yghsite.cn
+connect-src 'self' https://umami.yghsite.cn
+```
+
+### 9.3 同步任务已装好
+
+之前 `settings` 里的 `umami:*` 一直是空的，因为定时任务从没装上。
+现已启用 `umami-sync.timer`（每 5 分钟）与 `blog-prune.timer`（每小时）：
+
+```bash
+systemctl list-timers umami-sync.timer blog-prune.timer
+/etc/blog/umami.env      # 600 root，含 UMAMI_TOKEN
+```
+
+首次同步已写入：`umami:total = 4`、3 条路径统计。
+
+> **注意**：这个 4 是「修复前」的累计值 —— 说明统计脚本此前基本没在跑。
+> 真正有意义的数字要从现在开始累积。
+> 若要查历史真实访问量，Umami 后台（umami.yghsite.cn）里的数据更完整，
+> 那里的采集一直是独立的，不受本站 CSP 影响。

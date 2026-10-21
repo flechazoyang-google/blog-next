@@ -13,20 +13,40 @@ import type { NextConfig } from "next";
  */
 const CSP_MODE = process.env.CSP_MODE === "enforce" ? "enforce" : "report-only";
 
-const UMAMI = process.env.NEXT_PUBLIC_UMAMI_SRC;
-const umamiOrigin = (() => {
-  if (!UMAMI) return "";
+/**
+ * 统计脚本的源。
+ *
+ * 坑点：next.config.ts 是在**构建期**求值的，而 NEXT_PUBLIC_UMAMI_SRC 是
+ * systemd 在运行期注入的 —— 构建机上根本没有这个变量，于是 CSP 里漏掉了
+ * umami 的源，一旦把 CSP 从 Report-Only 切成 enforce，统计上报会被直接拦掉。
+ *
+ * 这里有两条路：
+ *   a) 构建时注入（要求构建机也配同一组环境变量，容易忘）
+ *   b) 给一个**默认值**兜住，再用环境变量覆盖（本次采用）
+ * 选 b，因为统计域名是固定的，忘配也不会静默失效。
+ */
+const UMAMI_SRC = process.env.NEXT_PUBLIC_UMAMI_SRC || "https://umami.yghsite.cn/script.js";
+
+function originOf(src: string): string {
   try {
-    return new URL(UMAMI).origin;
+    return new URL(src).origin;
   } catch {
     return "";
   }
-})();
+}
+
+// 构建期拿不到环境变量时，至少把已知的统计域名放行，避免 enforce 后统计失效
+const EXTRA_ORIGINS = (process.env.CSP_EXTRA_ORIGINS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const umamiOrigin = originOf(UMAMI_SRC);
+const allowedOrigins = [...new Set([umamiOrigin, ...EXTRA_ORIGINS].filter(Boolean))];
 
 function csp(extra: { scriptSrc?: string[]; styleSrc?: string[] } = {}) {
-  const scriptSrc = ["'self'", "'unsafe-inline'", ...(umamiOrigin ? [umamiOrigin] : []), ...(extra.scriptSrc ?? [])];
+  const scriptSrc = ["'self'", "'unsafe-inline'", ...allowedOrigins, ...(extra.scriptSrc ?? [])];
   const styleSrc = ["'self'", "'unsafe-inline'", ...(extra.styleSrc ?? [])];
-  const connectSrc = ["'self'", ...(umamiOrigin ? [umamiOrigin] : [])];
+  const connectSrc = ["'self'", ...allowedOrigins];
   return [
     "default-src 'self'",
     "script-src " + scriptSrc.join(" "),
