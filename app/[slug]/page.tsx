@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { Animations } from "@/components/Animations";
-import { formatDate } from "@/components/PostCard";
+import { formatDate, toIso } from "@/components/PostCard";
 import { getPostBySlug, getPageBySlug, parseJsonArray, readingTime, prevNextPost, makeExcerpt } from "@/lib/posts";
 import { renderMarkdown } from "@/lib/markdown";
 import { CommentSection } from "@/components/CommentSection";
@@ -43,7 +43,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             <header className="article-header">
               <h1 className="article-title">{doc.title}</h1>
               <div className="meta">
-                <time dateTime={doc.published_at || doc.created_at}>
+                <time dateTime={toIso(doc.published_at || doc.created_at)}>
                   {formatDate(doc.published_at || doc.created_at)}
                 </time>
                 <span className="dot">·</span>

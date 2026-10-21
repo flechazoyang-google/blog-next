@@ -15,7 +15,7 @@ export function PostCard({ href, title, excerpt, date, categories = [], readingT
       <h2>{title}</h2>
       {excerpt ? <div className="excerpt">{excerpt}</div> : null}
       <div className="meta">
-        <time dateTime={date}>{formatDate(date)}</time>
+        <time dateTime={toIso(date)}>{formatDate(date)}</time>
         {readingTime ? <><span className="dot">·</span><span>{readingTime} 分钟</span></> : null}
         {categories.map((c) => (
           <span key={c} className="cat">{c}</span>
@@ -23,6 +23,11 @@ export function PostCard({ href, title, excerpt, date, categories = [], readingT
       </div>
     </Link>
   );
+}
+
+export function toIso(d: string): string {
+  const t = new Date(d);
+  return isNaN(t.getTime()) ? d : t.toISOString();
 }
 
 export function formatDate(iso: string): string {
