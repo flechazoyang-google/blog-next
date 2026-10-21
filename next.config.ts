@@ -43,7 +43,7 @@ const EXTRA_ORIGINS = (process.env.CSP_EXTRA_ORIGINS || "")
 const umamiOrigin = originOf(UMAMI_SRC);
 const allowedOrigins = [...new Set([umamiOrigin, ...EXTRA_ORIGINS].filter(Boolean))];
 
-function csp(extra: { scriptSrc?: string[]; styleSrc?: string[] } = {}) {
+export function buildCsp(extra: { scriptSrc?: string[]; styleSrc?: string[] } = {}) {
   const scriptSrc = ["'self'", "'unsafe-inline'", ...allowedOrigins, ...(extra.scriptSrc ?? [])];
   const styleSrc = ["'self'", "'unsafe-inline'", ...(extra.styleSrc ?? [])];
   const connectSrc = ["'self'", ...allowedOrigins];
@@ -73,7 +73,14 @@ const baseSecurityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
 
-const cspHeader = CSP_MODE === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
+/**
+ * 重要：next.config 的 headers() 在**构建期**求值并写进 routes-manifest.json，
+ * 运行期改环境变量对它无效 —— 也就是说 CSP_MODE 这种开关放在这里是死代码。
+ * 实测确认过：以 CSP_MODE=enforce 启动，响应头仍然是 Report-Only。
+ *
+ * 所以 CSP 交给 proxy.ts 在运行期下发（它每个请求都执行，能读到当时的 env）。
+ * 这里只保留与 CSP 无关的静态安全头。
+ */
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -90,7 +97,6 @@ const nextConfig: NextConfig = {
         source: "/admin/:path*",
         headers: [
           ...baseSecurityHeaders,
-          { key: cspHeader, value: csp() },
           { key: "Cache-Control", value: "no-store, no-cache, must-revalidate, private" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
@@ -104,7 +110,7 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/:path*",
-        headers: [...baseSecurityHeaders, { key: cspHeader, value: csp() }],
+        headers: [...baseSecurityHeaders,],
       },
     ];
   },

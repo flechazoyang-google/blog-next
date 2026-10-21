@@ -365,3 +365,114 @@ cd /opt/blog && sudo -u blog DATA_DIR=/var/lib/blog UPLOAD_DIR=/var/www/blog-ima
 结果：18 张全部登记，孤儿归零，引用计数正确（如 `write.png refs=1` → 受删除保护）。
 
 > 这个脚本只需跑一次。以后新上传的图片由上传接口自动登记。
+
+
+---
+
+## 十一、CSP 运行期开关（2026-10-21 20:3x）
+
+### 11.1 先修一个我自己写错的指令
+
+原来文档里写的是：
+
+```bash
+sudo systemctl set-environment CSP_MODE=enforce && sudo systemctl restart blog
+```
+
+**这条命令无效。** 实测确认：以 `CSP_MODE=enforce` 启动后，响应头仍是
+`Content-Security-Policy-Report-Only`。
+
+根因：`next.config.ts` 的 `headers()` 在**构建期**求值，结果被固化成
+`.next/routes-manifest.json`。运行期改环境变量对它完全不生效 ——
+`CSP_MODE` 那段逻辑是死代码。这比"没做"更糟：你会以为切了，实际没有。
+
+### 11.2 已改为运行期下发
+
+CSP 现在由 `proxy.ts` 在每个请求上计算并下发（proxy 固定运行在 Node runtime，
+每个请求都执行，能读到当时的 env）。`next.config` 只保留与 CSP 无关的静态头。
+
+已验证：`routes-manifest.json` 里不再有任何 CSP 条目。
+
+**现在的正确用法：**
+
+```bash
+# 观察期（默认，不拦截任何东西，只在控制台报违规）
+sudo systemctl set-environment CSP_MODE=report-only
+
+# 确认无违规后切强制
+sudo systemctl set-environment CSP_MODE=enforce
+
+# 每次改完都要重启
+sudo systemctl restart blog
+
+# 验证是否真的切了
+curl -sI https://blog.yghsite.cn/ | grep -i content-security
+#   report-only -> content-security-policy-report-only:
+#   enforce     -> content-security-policy:
+```
+
+线上已双向实测：两种模式下响应头正确切换，页面 200、后台登录页 200。
+
+---
+
+## 十二、WordPress 已退役（2026-10-21 20:3x）
+
+### 12.1 退役前的核对（结论：安全）
+
+| 项 | 结果 |
+|---|---|
+| wpdb 内容 | 23 文章 / 8 页面 / 4 评论 / 37 表 / 9MB |
+| 新站对应 | 23 文章 / 4 页面 / 1 评论 |
+| 文章逐篇 | 一一对应（slug 差异仅因 WP 用 URL 编码、新站用明文） |
+| 正文长度 | 纯文本对比 91%（差额全是被剥离的 HTML 标签，非内容丢失） |
+| 坚果云 dump 复测 | **实际恢复到临时库验证过**：23/8/4/37 全部对上，含 `Dump completed` 收尾 |
+| WP 文件归档 | 141MB，14029 个文件可正常列出 |
+
+**那 6 个"缺失页面"不是内容**：归档/留言板/碎碎念/标签墙/站点地图/好友动态，
+正文均为 0–129 字节的空壳（只有 `[wp:archives]` 之类的短代码），
+新站已用原生功能替代（归档页 / 说说页 / 标签云 / sitemap.xml）。
+
+**丢失的 3 条评论**：`:flower-heihei:` 表情、一句 SEO 垃圾留言、一个"？"，无保留价值。
+
+### 12.2 执行了什么
+
+```bash
+systemctl stop mysql && systemctl disable mysql   # 先做可逆的
+rm -rf /var/www/html/wordpress                    # 332MB
+rm -rf /var/lib/mysql                            # 521MB
+rm -f  /var/www/html/phpinfo.php                 # 历史遗留的敏感文件
+apt-get purge mysql-server mysql-client php8.4-*  # 无业务再使用
+rm -rf /etc/mysql /var/log/mysql*
+```
+
+### 12.3 收益
+
+| 项 | 之前 | 之后 |
+|---|---|---|
+| 内存 available | 476 MB | **799 MB** |
+| 磁盘占用 | 13 GB | **12 GB**（可用 25→26 GB） |
+| mysqld 常驻内存 | 379 MB | 0 |
+| 开机自启服务 | 含 mysql/php8.4 | 已移除 |
+
+站点全部正常：四站 200、`/admin` 307、`/api/healthz` 200、nginx 语法检查通过。
+
+### 12.4 如果需要恢复 WordPress
+
+两份归档都在坚果云 `blog-migration-20261021/`：
+
+```bash
+# 1. 重装
+apt-get install -y mysql-server php8.4-fpm php8.4-mysql
+
+# 2. 恢复数据库（已实测可用）
+rclone cat jianguoyun:blog-migration-20261021/wpdb-20261021.sql | mysql wpdb
+
+# 3. 恢复文件
+rclone cat jianguoyun:blog-migration-20261021/wordpress-files-20261021.tar.gz \
+  | tar xzf - -C /var/www/html/
+
+# 4. 恢复 nginx 站点配置（可从坚果云 configs-20261021.tar.gz 取）
+```
+
+> 注意：本机已 purge MySQL/PHP，恢复需要重新安装。若只是想查一条历史内容，
+> 更快的办法是把 dump 恢复到任意一台有 MySQL 的机器上，不必动这台。

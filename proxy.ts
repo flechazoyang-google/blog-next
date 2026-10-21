@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { buildCsp } from "./next.config";
 
 /**
  * 粗粒度门禁（方案 A6 / P0-4）。
@@ -18,21 +19,42 @@ import { NextResponse, type NextRequest } from "next/server";
 const COOKIE_NAME = "blog_session";
 const COOKIE_RE = /^[0-9a-f]{64}$/; // 32 字节 hex；格式不对直接当未登录
 
+/**
+ * CSP 在**运行期**下发。
+ *
+ * 为什么不放在 next.config 的 headers()：那里是构建期求值、结果固化成
+ * routes-manifest.json，运行期改 CSP_MODE 无法生效（已实测确认）。
+ * proxy 每个请求都执行，能读到当时的 CSP_MODE，才能做到"观察期 -> 强制"
+ * 只改一个环境变量、重启即生效。
+ *
+ * 默认 report-only：全站大量内联 style，直接 enforce 有把界面打回原形的风险。
+ */
+function cspHeaders(pathname: string): Record<string, string> {
+  const mode = process.env.CSP_MODE === "enforce" ? "enforce" : "report-only";
+  const key = mode === "enforce" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only";
+  return { [key]: buildCsp() };
+}
+
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  const withCsp = (res: NextResponse) => {
+    for (const [k, v] of Object.entries(cspHeaders(pathname))) res.headers.set(k, v);
+    return res;
+  };
+
   // 登录页与登录接口本身不拦
-  if (pathname === "/admin/login" || pathname.startsWith("/api/auth/")) return NextResponse.next();
+  if (pathname === "/admin/login" || pathname.startsWith("/api/auth/")) return withCsp(NextResponse.next());
 
   const isAdminPage = pathname === "/admin" || pathname.startsWith("/admin/");
   const isAdminApi = pathname.startsWith("/api/admin/");
-  if (!isAdminPage && !isAdminApi) return NextResponse.next();
+  if (!isAdminPage && !isAdminApi) return withCsp(NextResponse.next());
 
   const cookie = req.cookies.get(COOKIE_NAME)?.value ?? "";
-  if (cookie && COOKIE_RE.test(cookie)) return NextResponse.next();
+  if (cookie && COOKIE_RE.test(cookie)) return withCsp(NextResponse.next());
 
   if (isAdminApi) {
-    return NextResponse.json({ error: "未登录或登录已过期", status: 401 }, { status: 401 });
+    return withCsp(NextResponse.json({ error: "未登录或登录已过期", status: 401 }, { status: 401 }));
   }
 
   // 页面：带上来源路径，登录后能回到原处
@@ -44,6 +66,13 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // 只跑在后台相关路径上，避免给全部静态资源增加开销
-  matcher: ["/admin/:path*", "/admin", "/api/admin/:path*", "/api/auth/:path*"],
+  /*
+   * 现在 proxy 还负责下发 CSP，所以不能再只匹配后台路径。
+   * 用负向匹配排除静态资源，避免给它们增加开销：
+   *   - _next/static 下的 chunk 是内容寻址的，无需 CSP
+   *   - images / favicon 等静态文件同理
+   */
+  matcher: [
+    "/((?!_next/static|_next/image|images/|favicon|icon-|apple-touch-icon|avatar|sw.js|offline.html).*)",
+  ],
 };
