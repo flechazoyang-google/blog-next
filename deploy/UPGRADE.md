@@ -634,3 +634,24 @@ new 能否用: 否 - A is not a constructor
 
 修复：改成 `Artalk.init({...})`，并把 catch 里的报错**原样显示**出来
 （原来只显示"加载失败"，把真实原因吞掉了 —— 这也是排查多花时间的原因）。
+
+### 13.10 「配置保存失败：read-only file system」（2026-10-21 23:1x）
+
+现象：在 `/sidebar` 后台改配置，弹出
+`配置保存失败: Error: 配置文件读取失败: open /data/artalk.yml: read-only file system`。
+
+根因：我在 compose/docker run 里把配置文件挂成了 `:ro`（只读）。
+当时想的是"配置不该被容器改"，但 **Artalk 的后台就是要改这个文件**。
+
+```diff
+- -v /opt/artalk/artalk.yml:/data/artalk.yml:ro
++ -v /opt/artalk/artalk.yml:/data/artalk.yml
+```
+
+注意 `data/` 目录本来就必须可写（SQLite 在那里），只有配置文件被我加成了只读。
+
+已验证：去掉 `:ro` 后 `RW=true`，后台 PUT `/api/v2/conf` 返回 200，
+且**配置文件内容不会被冲掉** —— Artalk 是读-改-写，原有的
+`login_timeout` / `moderator.pending_default` / `auth.*` 都完整保留（diff 只多一个空行）。
+
+> 若担心误改，正确做法是**定期备份** `/opt/artalk/artalk.yml`，而不是只读挂载。

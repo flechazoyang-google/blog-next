@@ -55,14 +55,14 @@ const allowedOrigins = [...new Set([umamiOrigin, artalkOrigin, ...EXTRA_ORIGINS]
 
 export function buildCsp(extra: { scriptSrc?: string[]; styleSrc?: string[] } = {}) {
   const scriptSrc = ["'self'", "'unsafe-inline'", ...allowedOrigins, ...(extra.scriptSrc ?? [])];
-  const styleSrc = ["'self'", "'unsafe-inline'", ...(extra.styleSrc ?? [])];
+  const styleSrc = ["'self'", "'unsafe-inline'", ...allowedOrigins, ...(extra.styleSrc ?? [])];
   const connectSrc = ["'self'", ...allowedOrigins];
   return [
     "default-src 'self'",
     "script-src " + scriptSrc.join(" "),
     "style-src " + styleSrc.join(" "),
     "img-src 'self' data: blob: https:",
-    "font-src 'self' data:",
+    "font-src " + ["'self'", "data:", ...allowedOrigins].join(" "),
     "connect-src " + connectSrc.join(" "),
     "media-src 'self' https:",
     // 文章里嵌了 bilibili 等播放器（hook.md 里有 iframe），需要放行 frame-src

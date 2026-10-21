@@ -10,7 +10,9 @@ services:
       - "127.0.0.1:23366:23366"
     volumes:
       - ./data:/data
-      - ./artalk.yml:/data/artalk.yml:ro
+      # 注意：不能加 :ro。Artalk 后台（/sidebar）改配置时要回写这个文件，
+      # 只读挂载会导致 "配置保存失败: read-only file system"
+      - ./artalk.yml:/data/artalk.yml
     environment:
       - TZ=Asia/Shanghai
     mem_limit: 192m

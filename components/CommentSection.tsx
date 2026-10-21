@@ -31,9 +31,23 @@ declare global {
 
 let loading: Promise<ArtalkApi> | null = null;
 
+/** Artalk 的样式表。不加载的话评论区会完全裸奔（只有文字没有布局）。
+ *  CSS 里的图标全是内联 data: SVG，无需额外放行域名。
+ */
+function ensureArtalkCss(): void {
+  const id = "artalk-css";
+  if (document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = ARTALK_SRC + "/dist/Artalk.css";
+  document.head.appendChild(link);
+}
+
 /** 只加载一次 Artalk 主脚本，多个组件共享 */
 function loadArtalk(): Promise<ArtalkApi> {
   if (typeof window === "undefined") return Promise.reject(new Error("ssr"));
+  ensureArtalkCss();
   if (window.Artalk?.init) return Promise.resolve(window.Artalk);
   if (loading) return loading;
 
