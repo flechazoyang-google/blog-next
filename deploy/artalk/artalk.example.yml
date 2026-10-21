@@ -65,7 +65,7 @@ email:
     host: smtp.qq.com
     port: 465
     username: your-name@example.com
-    password: fxrzjqcfadqtdfdf
+    password: REPLACE_ME_with_qq_smtp_authcode
   mail_subject: 博客评论
   send_addr: your-name@example.com
   send_name: flechazo（管理员）
