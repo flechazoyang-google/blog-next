@@ -33,14 +33,28 @@ export const POST = handle(async (req: NextRequest) => {
   }
 
   // 双桶限流：账号维度防定向爆破，IP 维度防撞库
+  /**
+   * 双桶限流。阈值取舍：
+   *   - 账号桶 15 次/15 分钟：足够容忍「手滑记错密码」，又能在被定向爆破时刹住。
+   *     原先设 10 次/小时，结果自己连试几次就被锁一小时 —— 对单人博客太苛刻，
+   *     而且体验上说不通：越是急着进去的时候越进不去。
+   *   - IP 桶 30 次/15 分钟：撞库防护，比账号桶宽，避免共用出口 IP 时误伤。
+   * 登录成功会同时清掉两个桶（见下方 reset），所以正常使用几乎碰不到上限。
+   */
+  const acctKey = "login:acct:" + username.toLowerCase();
+  const ipKey = "login:ip:" + ip;
   const limit = consumeAll([
-    { key: "login:acct:" + username.toLowerCase(), max: 10, windowSec: 3600 },
-    { key: "login:ip:" + ip, max: 20, windowSec: 3600 },
+    { key: acctKey, max: 15, windowSec: 900 },
+    { key: ipKey, max: 30, windowSec: 900 },
   ]);
   if (!limit.ok) {
     logAudit({ action: "login.fail", userName: username, meta: { reason: "rate-limited", bucket: limit.blockedKey }, ip, userAgent: ua });
     return noStore(NextResponse.json(
-      { error: "尝试次数过多，请 " + Math.ceil(limit.retryAfter / 60) + " 分钟后再试" },
+      {
+        error: "尝试次数过多，请 " + Math.ceil(limit.retryAfter / 60) + " 分钟后再试" +
+          "（若确认是本人操作，可在服务器执行：node /opt/blog/scripts/unlock.mjs --account " + username.toLowerCase() + "）",
+        retryAfter: limit.retryAfter,
+      },
       { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
     ));
   }
@@ -74,7 +88,7 @@ export const POST = handle(async (req: NextRequest) => {
 
   const { token } = createSession(user.id, { ip, userAgent: ua });
   await setSessionCookie(token);
-  reset(["login:acct:" + username.toLowerCase()]);
+  reset([acctKey, ipKey]);
   logAudit({ action: "login.ok", userId: user.id, userName: user.username, meta: { viaTotp: !!user.totp_enabled }, ip, userAgent: ua });
 
   return noStore(NextResponse.json({ ok: true }));
