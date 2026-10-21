@@ -52,11 +52,14 @@ export function listArchives(): { ym: string; posts: Post[] }[] {
 
 export function prevNextPost(publishedAt: string): { prev?: Post; next?: Post } {
   const db = getDb();
+  // 列表按时间倒序（最新在前），因此：
+  //   上一篇 = 列表里更靠上的一条 = 时间【更晚】的
+  //   下一篇 = 列表里更靠下的一条 = 时间【更早】的
   const prev = db.prepare(
-    "SELECT * FROM posts WHERE type='post' AND status='published' AND published_at < ? ORDER BY published_at DESC LIMIT 1"
+    "SELECT * FROM posts WHERE type='post' AND status='published' AND published_at > ? ORDER BY published_at ASC LIMIT 1"
   ).get(publishedAt) as Post | undefined;
   const next = db.prepare(
-    "SELECT * FROM posts WHERE type='post' AND status='published' AND published_at > ? ORDER BY published_at ASC LIMIT 1"
+    "SELECT * FROM posts WHERE type='post' AND status='published' AND published_at < ? ORDER BY published_at DESC LIMIT 1"
   ).get(publishedAt) as Post | undefined;
   return { prev, next };
 }

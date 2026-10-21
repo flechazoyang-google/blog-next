@@ -450,6 +450,9 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 /* ── 分页 ── */
 .pager { display: flex; justify-content: center; gap: 10px; margin-top: 40px; }
 
+/* 只在手机端显示的元素 */
+.only-mobile { display: none; }
+
 /* ── 响应式 ── */
 @media (max-width: 1200px) {
   .site-shell {
@@ -481,14 +484,36 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   .brand { flex-direction: row; align-items: center; gap: 12px; }
   .brand-avatar { width: 42px; height: 42px; font-size: 1.1rem; }
   .brand-name { font-size: 1.05rem; }
-  .brand-tagline, .sidebar-footer { display: none; }
-  .nav {
-    flex-direction: row; gap: 4px; overflow-x: auto;
-    margin-left: auto;
-    scrollbar-width: none;
+  .brand-tagline { display: none; }
+  /* 手机端：把「关于 / 友链」放到侧栏下方一行，避免顶部拥挤 */
+  .sidebar { flex-wrap: wrap; row-gap: 8px; }
+  .sidebar-footer {
+    display: flex;
+    width: 100%;
+    gap: 14px;
+    padding-top: 10px;
+    margin-top: 2px;
+    border-top: 1px solid var(--border);
+    font-size: .8rem;
   }
-  .nav::-webkit-scrollbar { display: none; }
-  .nav a { padding: 6px 10px; font-size: .875rem; white-space: nowrap; }
+  .only-mobile { display: inline; }
+  .sidebar-footer a { color: var(--text-p3); }
+  .sidebar-footer a:hover { color: var(--text-p0); }
+  /* 手机端导航：只显示主要三项，其余项（关于/友链）藏起来，
+     通过 .nav-more 在下方单独一行展示，避免顶部拥挤 */
+  .nav {
+    flex-direction: row;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .nav a {
+    padding: 5px 9px;
+    font-size: .82rem;
+    white-space: nowrap;
+    border-radius: 8px;
+  }
+  .nav a.nav-optional { display: none; }
+  .nav a.active { background: var(--bg-subtle); font-weight: 600; }
 
   .content { max-width: 100%; }
   .article-title { font-size: 1.5rem; }
