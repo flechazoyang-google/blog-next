@@ -1,0 +1,22 @@
+import type { MetadataRoute } from "next";
+import { listPosts, getPageBySlug } from "@/lib/posts";
+
+const SITE = "https://blog.yghsite.cn";
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const posts = listPosts({ limit: 1000 });
+  const entries: MetadataRoute.Sitemap = [
+    { url: SITE, lastModified: new Date(), priority: 1 },
+    { url: `${SITE}/shuoshuo`, lastModified: new Date(), priority: 0.6 },
+    { url: `${SITE}/archives`, lastModified: new Date(), priority: 0.6 },
+    { url: `${SITE}/about`, lastModified: new Date(), priority: 0.5 },
+  ];
+  for (const p of posts) {
+    entries.push({
+      url: `${SITE}/${encodeURIComponent(p.slug)}`,
+      lastModified: new Date(p.updated_at),
+      priority: 0.8,
+    });
+  }
+  return entries;
+}

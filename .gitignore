@@ -1,0 +1,10 @@
+node_modules/
+.next/
+out/
+dist/
+data/*.db
+data/*.db-*
+public/images/
+*.log
+_*
+.env*.local
