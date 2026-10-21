@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 type Initial = {
   id?: number; type?: string; title?: string; slug?: string; content?: string;
   status?: string; categories?: string[]; tags?: string[]; cover?: string | null; published_at?: string | null;
+  comments_enabled?: number;
 };
 
 const DRAFT_KEY = (id?: number) => "blog-draft-" + (id ?? "new");
@@ -28,6 +29,7 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
   const [tags, setTags] = useState((initial?.tags || []).join(", "));
   const [status, setStatus] = useState(initial?.status || "draft");
   const [cover, setCover] = useState<string | null>(initial?.cover ?? null);
+  const [commentsEnabled, setCommentsEnabled] = useState<boolean>((initial?.comments_enabled ?? 1) !== 0);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -153,6 +155,7 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
       categories: cats.split(",").map((x) => x.trim()).filter(Boolean),
       tags: tags.split(",").map((x) => x.trim()).filter(Boolean),
       status: st,
+      comments_enabled: commentsEnabled,
     };
     const url = mode === "new" ? "/api/admin/posts" : "/api/admin/posts/" + initial?.id;
     const res = await fetch(url, {
@@ -330,6 +333,19 @@ export function Editor({ initial, mode }: { initial?: Initial; mode: "new" | "ed
           </div>
         </div>
       ) : null}
+
+      {/* 单篇评论开关：页面类型默认也想开评论，但隐私政策这类应当可以单独关掉 */}
+      <label style={{
+        display: "flex", gap: 8, alignItems: "center", marginTop: 14,
+        fontSize: ".86rem", color: "var(--text-p2)", cursor: "pointer",
+      }}>
+        <input type="checkbox" checked={commentsEnabled}
+               onChange={(ev) => { setCommentsEnabled(ev.target.checked); mark(); }} />
+        允许评论
+        <span style={{ fontSize: ".76rem", color: "var(--text-p4)" }}>
+          （关闭后该页面不显示评论区）
+        </span>
+      </label>
 
       <div style={{
         position: "sticky", bottom: 0, marginTop: 20, padding: "12px 0",

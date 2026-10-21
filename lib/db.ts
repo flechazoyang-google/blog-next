@@ -55,7 +55,7 @@ export type Post = {
   content: string; excerpt: string; status: PostStatus;
   categories: string; tags: string; cover: string | null; wp_id: number | null;
   published_at: string | null; created_at: string; updated_at: string;
-  deleted_at: string | null;
+  deleted_at: string | null; comments_enabled: number;
 };
 
 export type Comment = {

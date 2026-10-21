@@ -224,6 +224,16 @@ const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    name: "0010_page_comments",
+    up: (db) => {
+      // 页面（page）也能有评论区，但隐私政策这类不该有。
+      // 给 posts 加一个开关，默认页面关闭、文章开启（文章本就有评论，不受影响）。
+      addColumn(db, "posts", "comments_enabled", "INTEGER NOT NULL DEFAULT 1");
+      // 隐私政策默认关掉；其余页面保持开启
+      db.prepare("UPDATE posts SET comments_enabled = 0 WHERE type = 'page' AND slug = 'privacy-policy'").run();
+    },
+  },
 ];
 
 export function currentVersion(db: Database.Database): string | null {
@@ -241,9 +251,12 @@ export function migrate(db: Database.Database): { applied: string[]; version: st
     ")"
   );
   const done = new Set((db.prepare("SELECT name FROM schema_version").all() as { name: string }[]).map((r) => r.name));
+  // 按 name 排序后执行：迁移编号本身就是顺序的唯一依据，
+  // 这样即使数组里手写顺序错了（曾经把 0010 写在 0009 前面导致 0010 被跳过），也不会漏应用。
+  const ordered = [...MIGRATIONS].sort((a, b) => a.name.localeCompare(b.name));
   const applied: string[] = [];
   const ins = db.prepare("INSERT INTO schema_version (name, applied_at) VALUES (?, ?)");
-  for (const m of MIGRATIONS) {
+  for (const m of ordered) {
     if (done.has(m.name)) continue;
     db.transaction(() => {
       m.up(db);

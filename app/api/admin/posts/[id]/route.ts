@@ -70,15 +70,21 @@ export const PATCH = handle(async (req: NextRequest, { params }: Params) => {
   const becomingPublished = status === "published" && existing.status !== "published";
   const publishedAt = existing.published_at ?? (status === "published" ? nowIso() : null);
 
+  // comments_enabled：允许单独给某一篇/某一页关掉评论
+  const commentsEnabled =
+    typeof body.comments_enabled === "boolean"
+      ? (body.comments_enabled ? 1 : 0)
+      : ((db.prepare("SELECT comments_enabled FROM posts WHERE id = ?").get(id) as { comments_enabled: number } | undefined)?.comments_enabled ?? 1);
+
   const info = db.prepare(
     "UPDATE posts SET type = ?, title = ?, slug = ?, content = ?, excerpt = ?, status = ?, categories = ?, tags = ?, " +
-    "cover = COALESCE(?, cover), published_at = ?, updated_at = ? WHERE id = ?"
+    "cover = COALESCE(?, cover), published_at = ?, updated_at = ?, comments_enabled = ? WHERE id = ?"
   ).run(
     type, title, slug, content, makeExcerpt(content, 160), status,
     JSON.stringify(categories), JSON.stringify(tags),
     typeof body.cover === "string" && body.cover ? body.cover : null,
     becomingPublished ? (publishedAt ?? nowIso()) : publishedAt,
-    nowIso(), id
+    nowIso(), commentsEnabled, id
   );
   if (info.changes === 0) throw notFound("文章不存在");
 

@@ -119,7 +119,12 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             </nav>
           ) : null}
 
-          {post && settings.commentEnabled ? <CommentSection postId={doc.id} pageKey={"/" + decodeSlug(slug)} /> : null}
+          {/* 评论：按「单页开关 + 全站开关」双重判断。
+              原先只判断 post（文章 type），导致「友链」「关于」这类页面完全没有评论区。
+              现在用 posts.comments_enabled 逐条控制（隐私政策默认关闭）。 */}
+          {doc && settings.commentEnabled && doc.comments_enabled !== 0 ? (
+            <CommentSection postId={doc.id} pageKey={"/" + decodeSlug(slug)} />
+          ) : null}
         </main>
         <div className="toc-col"><RightBar toc={toc} /></div>
       </div>

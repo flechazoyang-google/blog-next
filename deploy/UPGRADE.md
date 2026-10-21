@@ -810,3 +810,41 @@ WARN [config/base.go:205] 未找到 IP 数据库文件："./data/ip2region.xdb"�
 从 GitHub raw 下载会因为 LFS 只拿到指针文件（约 266KB，正常应约 11MB），
 应改用 release 附件或 `https://cdn.jsdelivr.net/npm/ip2region@...` 之类的直链。
 **不影响评论与邮件功能**，只是评论不显示"来自哪个省"。
+
+### 13.15 页面（友链/关于）没有评论区（2026-10-22 00:3x）
+
+现象：「友链」「关于」这类**页面**（`type=page`）不显示评论区，只有文章有。
+
+根因：`app/[slug]/page.tsx` 里的判断是 `{post && ...}`，而 `post` 只对 `type="post"` 赋值，
+页面走的是 `page` 分支，`post` 为 null，所以整块评论区不渲染。
+
+改为按**每条内容的开关**判断，而不是按 type 一刀切：
+
+- 新增迁移 `0010_page_comments`：给 `posts` 加 `comments_enabled INTEGER DEFAULT 1`
+- 隐私政策默认关闭（`comments_enabled=0`），其余页面与文章默认开启
+- 后台编辑器加「允许评论」勾选框，可逐条控制
+- 渲染条件：`doc && settings.commentEnabled && doc.comments_enabled !== 0`
+
+验证结果：
+
+| 页面 | 评论区 |
+|---|---|
+| 友链 | ✓ 有 |
+| 关于 | ✓ 有 |
+| 隐私政策 | ✗ 无（按预期关闭） |
+| 文章 | ✓ 有 |
+
+### 13.16 顺带修掉迁移器的一个隐患
+
+加 `0010` 时我把它写在了 `0009` **前面**，结果 `0010` 被静默跳过 ——
+因为迁移器是按数组书写顺序执行的，`0010` 在 `0009` 已应用的前提下仍会被当成"新的一条"执行…
+实际表现是：`schema_version` 里有 `0009`，但没有 `0010`，字段没加上，接口报 `no such column`。
+
+**修复**：迁移器现在**按 name 排序后执行**，不再依赖数组书写顺序：
+
+```ts
+const ordered = [...MIGRATIONS].sort((a, b) => a.name.localeCompare(b.name));
+for (const m of ordered) { ... }
+```
+
+迁移编号本身就是顺序的唯一依据，这样手写顺序错了也不会漏应用。

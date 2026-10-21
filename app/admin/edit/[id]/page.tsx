@@ -16,7 +16,7 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
 
   const row = getDb().prepare("SELECT * FROM posts WHERE id = ?").get(numId) as
     | { id: number; type: string; title: string; slug: string; content: string; status: string;
-        categories: string; tags: string; cover: string | null; published_at: string | null }
+        categories: string; tags: string; cover: string | null; published_at: string | null; comments_enabled: number }
     | undefined;
   if (!row) notFound();
 
@@ -32,6 +32,7 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
           content: row.content, status: row.status, cover: row.cover,
           categories: parseJsonArray(row.categories), tags: parseJsonArray(row.tags),
           published_at: row.published_at ?? null,
+          comments_enabled: row.comments_enabled ?? 1,
         }}
       />
     </AdminShell>

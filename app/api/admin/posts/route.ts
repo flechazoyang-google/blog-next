@@ -76,14 +76,16 @@ export const POST = handle(async (req: NextRequest) => {
   const publishedAt = isPublished ? (typeof body.published_at === "string" ? body.published_at : nowIso()) : null;
   const now = nowIso();
 
+  const commentsEnabled = typeof body.comments_enabled === "boolean" ? (body.comments_enabled ? 1 : 0) : 1;
+
   const info = db.prepare(
-    "INSERT INTO posts (type, title, slug, content, excerpt, status, categories, tags, cover, published_at, created_at, updated_at) " +
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO posts (type, title, slug, content, excerpt, status, categories, tags, cover, published_at, created_at, updated_at, comments_enabled) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(
     type, titleVal, finalSlug, content, makeExcerpt(content, 160), status,
     JSON.stringify(categories), JSON.stringify(tags),
     typeof body.cover === "string" && body.cover ? body.cover : null,
-    publishedAt, now, now
+    publishedAt, now, now, commentsEnabled
   );
 
   logAudit({
