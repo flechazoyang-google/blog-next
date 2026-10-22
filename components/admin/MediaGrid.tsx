@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Item = {
@@ -13,12 +13,22 @@ export function MediaGrid({ items }: { items: Item[] }) {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [orphans, setOrphans] = useState<string[] | null>(null);
+  /* 铁律 10：复制反馈自熄——记录刚复制的那一项，2.5s 后自动淡出恢复 */
+  const [copied, setCopied] = useState<string | null>(null);
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const copy = async (p: string) => {
+    // 重复点击先清计时器：不叠加、不闪烁、不提前熄灭
+    if (copyTimer.current) { clearTimeout(copyTimer.current); copyTimer.current = null; }
     try {
       await navigator.clipboard.writeText("![](" + p + ")");
+      setCopied(p);
       setMsg("已复制 Markdown 引用：" + p);
-      setTimeout(() => setMsg(""), 2000);
+      copyTimer.current = setTimeout(() => {
+        setCopied(null);
+        setMsg("");
+        copyTimer.current = null;
+      }, 2500);
     } catch {
       setErr("复制失败，请手动选取");
     }
@@ -86,7 +96,13 @@ export function MediaGrid({ items }: { items: Item[] }) {
                   {" · "}{m.refs > 0 ? "引用 " + m.refs : "未引用"}
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button className="btn btn-sm" style={{ padding: "2px 8px", fontSize: ".72rem" }} onClick={() => copy(m.path)}>复制</button>
+                  <button
+                    className="btn btn-sm copy-btn"
+                    data-done={copied === m.path ? "true" : "false"}
+                    aria-live="polite"
+                    style={{ padding: "2px 8px", fontSize: ".72rem" }}
+                    onClick={() => copy(m.path)}
+                  >{copied === m.path ? "已复制" : "复制"}</button>
                   <button className="btn btn-sm" disabled={busy || m.refs > 0}
                           title={m.refs > 0 ? "仍被文章引用，不能删除" : "删除"}
                           style={{ padding: "2px 8px", fontSize: ".72rem", opacity: m.refs > 0 ? .45 : 1 }}
