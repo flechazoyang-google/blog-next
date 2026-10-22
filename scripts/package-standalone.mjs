@@ -14,17 +14,28 @@ const OUT = path.join(ROOT, "dist");
 const STANDALONE = path.join(ROOT, ".next", "standalone");
 
 /**
- * Windows 上 rmSync 遇到只读文件会抛 EPERM，而 public/ 里有文件是 444
- * （历史上被手工改成只读，git 也保留了位）。先递归去掉只读位再删。
+ * 递归删除。两个必须绕开的坑：
+ *
+ * 1) Windows 上遇到只读文件会 EPERM，而 public/ 里就有 444 的文件
+ *    （历史上被手工改成只读，git 也保留了位）。
+ * 2) **Node 24 在 Windows 上，fs.rmSync 删除某些中文文件名会直接让进程
+ *    崩溃（0xC0000409），try/catch 完全接不住** —— 实测 "做.md" 必崩，
+ *    而 "中文.md" 正常。这不是权限问题，换个目录、换台机器症状一致。
+ *    改用 unlinkSync + rmdirSync 手动递归则一切正常。
+ *
+ * dist/ 里含大量中文文件名（out/posts/*.md），所以这里绝不能用 rmSync。
  */
 function forceRemove(target) {
   if (!fs.existsSync(target)) return;
   const st = fs.lstatSync(target);
   if (st.isDirectory()) {
     for (const e of fs.readdirSync(target)) forceRemove(path.join(target, e));
+    try { fs.chmodSync(target, 0o666); } catch { /* 已经可写 */ }
+    fs.rmdirSync(target);
+    return;
   }
-  try { fs.chmodSync(target, 0o666); } catch { /* 已经是可写的 */ }
-  fs.rmSync(target, { recursive: true, force: true });
+  try { fs.chmodSync(target, 0o666); } catch { /* 已经可写 */ }
+  fs.unlinkSync(target);
 }
 
 forceRemove(OUT);
