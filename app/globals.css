@@ -291,6 +291,53 @@ a:hover { color: var(--link-hover); }
   margin: 1.4em 0;
   cursor: zoom-in;
 }
+
+/* ── 内嵌视频 / iframe（B 站、YouTube 等）──────────────────────
+   WordPress 迁移过来的嵌入是 <div class="wp-block-embed__wrapper"> 包一个
+   position:absolute 的 iframe（WP 用这套做响应式比例）。转换脚本剥掉了
+   外层容器却留下绝对定位，导致 iframe 相对**视口**定位、铺满整屏，
+   把正文和侧栏全盖住。
+
+   这里补回容器语义：用 aspect-ratio 撑出 16:9，iframe 填满这一格。
+   不依赖文章内容改写，任何绝对定位的嵌入都会被收进这个盒子。 */
+.prose iframe {
+  max-width: 100%;
+  border: none;
+  border-radius: 10px;
+}
+.prose iframe[style*="position:absolute"],
+.prose iframe[style*="position: absolute"] {
+  position: static !important;
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9;
+  left: auto !important;
+  top: auto !important;
+  margin: 1.4em 0;
+}
+
+/* 如果外层还有 WP 遗留的 wrapper，一并兜住 */
+.prose .wp-block-embed,
+.prose .wp-block-embed__wrapper,
+.prose .video-container,
+.prose figure.iframe {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 1.4em 0;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.prose .wp-block-embed iframe,
+.prose .wp-block-embed__wrapper iframe,
+.prose .video-container iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
 .prose hr { border: none; border-top: 1px solid var(--border); margin: 2.4em 0; }
 .prose a {
   color: var(--link);
