@@ -114,8 +114,30 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
 
           {nav.prev || nav.next ? (
             <nav className="article-nav" aria-label="上下篇">
-              {nav.prev ? <Link href={"/" + encodeURIComponent(nav.prev.slug)} className="btn btn-sm">← {nav.prev.title}</Link> : <span />}
-              {nav.next ? <Link href={"/" + encodeURIComponent(nav.next.slug)} className="btn btn-sm">{nav.next.title} →</Link> : null}
+              {nav.prev ? (
+                <Link href={"/" + encodeURIComponent(nav.prev.slug)} className="article-nav-item prev">
+                  <span className="article-nav-label">
+                    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden>
+                      <path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" strokeWidth="2"
+                            strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    上一篇
+                  </span>
+                  <span className="article-nav-title">{nav.prev.title}</span>
+                </Link>
+              ) : <span />}
+              {nav.next ? (
+                <Link href={"/" + encodeURIComponent(nav.next.slug)} className="article-nav-item next">
+                  <span className="article-nav-label">
+                    下一篇
+                    <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden>
+                      <path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2"
+                            strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                  <span className="article-nav-title">{nav.next.title}</span>
+                </Link>
+              ) : null}
             </nav>
           ) : null}
 
