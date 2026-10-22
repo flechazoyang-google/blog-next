@@ -13,7 +13,21 @@ const ROOT = process.cwd();
 const OUT = path.join(ROOT, "dist");
 const STANDALONE = path.join(ROOT, ".next", "standalone");
 
-fs.rmSync(OUT, { recursive: true, force: true });
+/**
+ * Windows 上 rmSync 遇到只读文件会抛 EPERM，而 public/ 里有文件是 444
+ * （历史上被手工改成只读，git 也保留了位）。先递归去掉只读位再删。
+ */
+function forceRemove(target) {
+  if (!fs.existsSync(target)) return;
+  const st = fs.lstatSync(target);
+  if (st.isDirectory()) {
+    for (const e of fs.readdirSync(target)) forceRemove(path.join(target, e));
+  }
+  try { fs.chmodSync(target, 0o666); } catch { /* 已经是可写的 */ }
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
+forceRemove(OUT);
 fs.mkdirSync(OUT, { recursive: true });
 
 function copyDir(src, dst) {
@@ -36,7 +50,11 @@ function copyDir(src, dst) {
     }
 
     if (stat.isDirectory()) copyDir(s, d);
-    else fs.copyFileSync(s, d);
+    else {
+      // 目标可能是上次留下的只读文件，先解锁再覆盖
+      if (fs.existsSync(d)) { try { fs.chmodSync(d, 0o666); } catch { /* ignore */ } }
+      fs.copyFileSync(s, d);
+    }
   }
 }
 
@@ -85,4 +103,18 @@ function copyRuntimeDeps() {
 }
 
 copyRuntimeDeps();
+
+/**
+ * 打版本戳：产出 dist/.build-info.json，供运行期 healthz 读取。
+ * 顺序无所谓（读的是 git 状态而非产物），放最后让日志更清楚。
+ */
+const { execFileSync } = await import("node:child_process");
+try {
+  execFileSync(process.execPath, [path.join(ROOT, "scripts", "stamp-version.mjs")], {
+    cwd: ROOT, stdio: "inherit",
+  });
+} catch {
+  console.warn("!! 版本戳写入失败，healthz 的 commit 将为 null");
+}
+
 console.log("dist ready:", OUT);

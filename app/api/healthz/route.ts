@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb, dbPath } from "@/lib/db";
 import { currentVersion, hasFts } from "@/lib/migrations";
 import { getSettings } from "@/lib/settings";
+import { getBuildInfo } from "@/lib/build-info";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +19,19 @@ export async function GET() {
     const s = getSettings();
     const mem = process.memoryUsage();
 
+    // 版本戳：让"线上跑的是哪次提交"可被外部查证。
+    // 缺 .build-info.json 时为 null，不影响探活。
+    const build = getBuildInfo();
+
     return NextResponse.json({
       ok: true,
       time: new Date().toISOString(),
+      commit: build?.shortCommit ?? null,
+      commitFull: build?.commit ?? null,
+      branch: build?.branch ?? null,
+      // false = 构建时有未提交改动，产物无法用 git 复现
+      reproducible: build?.reproducible ?? null,
+      builtAt: build?.builtAt ?? null,
       schema: currentVersion(db),
       fts: hasFts(db),
       posts: c("SELECT COUNT(*) c FROM posts WHERE status = 'published' AND deleted_at IS NULL"),
