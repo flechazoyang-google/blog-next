@@ -102,7 +102,18 @@ function copyRuntimeDeps() {
     const from = path.join(src, name);
     if (!fs.existsSync(from)) { missing.push(name); return; }
     const to = path.join(dst, name);
-    if (!fs.existsSync(to)) { copyDir(from, to); copied++; }
+    /**
+     * 不能因为目标已存在就跳过（原实现是 `if (!exists) copy`）。
+     *
+     * standalone 会给 native 依赖留一个**只含 package.json 的空壳**目录
+     * （better-sqlite3 就是这样），真正的二进制和 lib/ 靠符号链接指过去。
+     * 若一路跳过，产物里就只剩个 package.json，运行时报
+     * "Cannot find module ...better-sqlite3-<hash>"。
+     *
+     * copyDir 本身是覆盖式递归复制，直接调用即可把空壳补齐。
+     */
+    copyDir(from, to);
+    copied++;
     let meta;
     try { meta = JSON.parse(fs.readFileSync(path.join(from, "package.json"), "utf8")); } catch { return; }
     for (const dep of Object.keys(meta.dependencies || {})) walk(dep);
@@ -114,6 +125,47 @@ function copyRuntimeDeps() {
 }
 
 copyRuntimeDeps();
+
+/**
+ * 修补 .next/node_modules 下的 native 依赖副本（必须在 copyRuntimeDeps 之后）。
+ *
+ * Next 的 standalone 输出会把 serverExternalPackages（这里是 better-sqlite3）
+ * 放两处：
+ *   1) node_modules/better-sqlite3           <- 只有 package.json 的空壳
+ *   2) .next/node_modules/better-sqlite3-<hash> <- 软链，指向上面那个空壳
+ * 真正的 lib/ 与 build/Release/*.node 都不在 standalone 里。
+ *
+ * copyDir 遇到软链会 realpathSync 解析后复制，但解析到的就是空壳，
+ * 于是产物里只剩 package.json，运行时直接
+ * "Cannot find module .../lib/index.js"。
+ *
+ * copyRuntimeDeps 已把完整依赖补进 dist/node_modules/better-sqlite3，
+ * 这里把 .next/node_modules 下的副本也补齐（Windows 上软链已被实体化成目录，
+ * Linux 上则需要单独处理）。
+ */
+function patchNestedNativeDeps() {
+  const srcRoot = path.join(OUT, "node_modules");
+  const nestedRoot = path.join(OUT, ".next", "node_modules");
+  if (!fs.existsSync(nestedRoot)) return;
+
+  for (const entry of fs.readdirSync(nestedRoot)) {
+    // better-sqlite3-<hash> -> 取包名
+    const pkgName = entry.replace(/-[0-9a-f]{16}$/, "");
+    const realSrc = path.join(srcRoot, pkgName);
+    if (!fs.existsSync(realSrc)) continue;
+
+    const target = path.join(nestedRoot, entry);
+    const st = fs.lstatSync(target);
+    // Linux: 软链；Windows: 已被实体化的目录。两种都重建
+    if (st.isSymbolicLink() || st.isDirectory()) {
+      forceRemove(target);
+      copyDir(realSrc, target);
+      console.log("已修补嵌套 native 依赖：", entry);
+    }
+  }
+}
+
+patchNestedNativeDeps();
 
 /**
  * 打版本戳：产出 dist/.build-info.json，供运行期 healthz 读取。

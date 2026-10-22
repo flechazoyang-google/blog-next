@@ -94,6 +94,46 @@ const baseSecurityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+
+  /**
+   * 依赖追踪排除（2026-10-22）。
+   *
+   * 问题：lib/db.ts、app/api/admin/upload 等处写了
+   * `path.join(process.cwd(), "data")` 这类运行期才求值的路径。
+   * Next 的 nft 静态分析无法确定实际会读哪些文件，于是**把整个项目根
+   * 目录都收进产物** —— healthz 的 trace 里就有 346 个文件，包括
+   * drafts/（未发布草稿）、tests/、docs/、甚至 blog.db 和 dist.tar.gz。
+   *
+   * 后果有两个，都很严重：
+   *   1) 发布包从约 60MB 涨到 225MB，每次部署都在搬运源码；
+   *   2) **未发布的草稿会跟着产物一起上传到服务器**，属于内容泄露。
+   *
+   * 这些目录运行期完全用不到（数据走 DATA_DIR 环境变量指向
+   * /var/lib/blog，上传走 UPLOAD_DIR），直接排除。
+   */
+  outputFileTracingExcludes: {
+    "*": [
+      "drafts/**",
+      "tests/**",
+      "docs/**",
+      "out/**",
+      "content/**",
+      "deploy/**",
+      "scripts/**",
+      "app/**",
+      "components/**",
+      "lib/**",
+      "data/**",
+      "*.md",
+      "*.db",
+      "*.tar.gz",
+      "tsconfig.tsbuildinfo",
+      "package-lock.json",
+      "postcss.config.mjs",
+      "proxy.ts",
+      "next.config.ts",
+    ],
+  },
   serverExternalPackages: ["better-sqlite3"],
   images: { unoptimized: true },
   experimental: {
