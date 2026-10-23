@@ -9,6 +9,7 @@ export type AuditAction =
   | "comment.approve" | "comment.spam" | "comment.delete" | "comment.bulk" | "comment.reply"
   | "upload.create" | "media.delete" | "media.orphans"
   | "settings.update"
+  | "links.create" | "links.update" | "links.delete"
   | "totp.start" | "totp.enable" | "totp.disable"
   | "recovery.regenerate"
   | "password.change"
@@ -18,7 +19,7 @@ export type AuditInput = {
   action: AuditAction;
   userId?: number | null;
   userName?: string;
-  targetType?: "post" | "comment" | "media" | "setting" | "user" | "session";
+  targetType?: "post" | "comment" | "media" | "setting" | "user" | "session" | "friend_link";
   targetId?: string | number;
   meta?: Record<string, unknown>;
   ip?: string;

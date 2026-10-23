@@ -1,6 +1,6 @@
 # 博客管理后台升级方案
 
-> 制定时间：2026-10-21 · 基于 `E:/agentWork/blog-next` 实际代码审计（非猜测，下文每条都给了文件行号）
+> 制定时间：2026-10-21 · 基于 `E:/agentWork/Server management/blog-next` 实际代码审计（非猜测，下文每条都给了文件行号）
 > 线上：https://blog.yghsite.cn（Next.js 16 standalone + better-sqlite3，`blog.service` @ 127.0.0.1:8090）
 > dev 库实测规模：31 条内容（23 文章 / 3 页面 / 5 说说）/ 5 评论 / 1 用户 / **0 媒体记录 / 0 设置行 / 0 会话行**
 

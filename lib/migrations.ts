@@ -234,6 +234,45 @@ const MIGRATIONS: Migration[] = [
       db.prepare("UPDATE posts SET comments_enabled = 0 WHERE type = 'page' AND slug = 'privacy-policy'").run();
     },
   },
+
+  {
+    name: "0011_friend_links",
+    up: (db) => {
+      // 友链/聚合外链（2026-10-23）：此前 settings.friend_links 只是一段自由文本，
+      // 全库 0 处渲染 —— 既没有前台展示，也没法在后台逐条增删。
+      // 改成独立表：一行一条外链，带排序与显示开关，后台可增删改。
+      // sort_order 升序（小的在前），同值时按 id 保序，避免顺序抖动。
+      db.exec(
+        "CREATE TABLE IF NOT EXISTS friend_links (" +
+        "  id         INTEGER PRIMARY KEY AUTOINCREMENT," +
+        "  name       TEXT NOT NULL," +
+        "  url        TEXT NOT NULL," +
+        "  desc       TEXT NOT NULL DEFAULT ''," +
+        "  kind       TEXT NOT NULL DEFAULT 'friend'," +
+        "  sort_order INTEGER NOT NULL DEFAULT 100," +
+        "  visible    INTEGER NOT NULL DEFAULT 1," +
+        "  created_at TEXT NOT NULL DEFAULT (datetime('now'))," +
+        "  updated_at TEXT NOT NULL DEFAULT (datetime('now'))" +
+        ")"
+      );
+      db.exec("CREATE INDEX IF NOT EXISTS idx_friend_links_order ON friend_links(visible, sort_order, id)");
+
+      // 预置「开往」聚合外链：这是本站明确要求常驻的入口。
+      // 只在表为空时插入，避免覆盖用户在后台已有的数据；用户删掉后不会复活（迁移只跑一次）。
+      const empty = (db.prepare("SELECT COUNT(*) c FROM friend_links").get() as { c: number }).c === 0;
+      if (empty) {
+        db.prepare(
+          "INSERT INTO friend_links (name, url, desc, kind, sort_order, visible) VALUES (?, ?, ?, ?, ?, 1)"
+        ).run(
+          "开往",
+          "https://www.travellings.cn/go.html",
+          "友链接力 · 随机去往一个陌生博客",
+          "hub",
+          10
+        );
+      }
+    },
+  },
 ];
 
 export function currentVersion(db: Database.Database): string | null {

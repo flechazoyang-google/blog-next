@@ -3,6 +3,7 @@ import { TAGS } from "./posts";
 import * as posts from "./posts";
 import * as stats from "./site-stats";
 import { getSettings, type Settings } from "./settings";
+import { listVisibleFriendLinks } from "./friend-links";
 
 /**
  * 数据层缓存（方案 P4）。
@@ -107,6 +108,18 @@ export const getPageViewsCached = unstable_cache(
 export const getSettingsCached = unstable_cache(
   async () => getSettings(),
   ["settings:all"],
+  { revalidate: TTL, tags: [TAGS.stats] }
+);
+
+/* ------------------------------ 友链/外链 ------------------------------ */
+
+/**
+ * 前台侧栏的友链 + 聚合外链。
+ * 挂在 TAGS.stats 下：它和站点统计同属"侧栏展示数据"，后台一保存就整块失效。
+ */
+export const listFriendLinksCached = unstable_cache(
+  async () => listVisibleFriendLinks(),
+  ["friend-links:visible"],
   { revalidate: TTL, tags: [TAGS.stats] }
 );
 

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { getSiteStatsCached, getTagCloudCached } from "@/lib/cached";
+import { FriendLinks } from "./FriendLinks";
 
 type Toc = { level: number; text: string; id: string }[];
 
-/** 桌面端右侧栏：站点统计 + 标签云（文章页还会在上面显示目录） */
+/** 桌面端右侧栏：站点统计 + 聚合外链 + 友链 + 标签云（文章页还会在上面显示目录） */
 export async function RightBar({ toc }: { toc?: Toc }) {
   const stats = await getSiteStatsCached();
   const tags = await getTagCloudCached(14);
@@ -41,6 +42,9 @@ export async function RightBar({ toc }: { toc?: Toc }) {
           ))}
         </div>
       </section>
+
+      {/* 聚合站 / 友链（数据来自 friend_links 表，后台可增删） */}
+      <FriendLinks />
 
       {/* 标签云 */}
       {tags.length > 0 ? (

@@ -5,6 +5,7 @@ import { MobileNav } from "@/components/MobileNav";
 import { Analytics } from "@/components/Analytics";
 import { PwaRegister } from "@/components/PwaRegister";
 import { getSettings } from "@/lib/settings";
+import { listFriendLinksCached } from "@/lib/cached";
 
 /**
  * C4：站名/描述此前硬编码在这里，改一个字要重新构建。
@@ -51,12 +52,22 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // 手机端抽屉里的聚合/友链：layout 在服务端取一次数据传下去。
+  // MobileNav 是客户端组件（要管抽屉开关），不能直接塞 async server component。
+  const drawerLinks = (await listFriendLinksCached()).map((l) => ({
+    id: l.id,
+    name: l.name,
+    url: l.url,
+    desc: l.desc,
+    kind: l.kind,
+  }));
+
   return (
     <html lang="zh-CN">
       <body>
         <ScrollReset />
-        <MobileNav />
+        <MobileNav links={drawerLinks} />
         {children}
         <Analytics />
         <PwaRegister />

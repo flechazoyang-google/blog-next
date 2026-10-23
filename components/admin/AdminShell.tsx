@@ -6,6 +6,7 @@ const NAV = [
   { href: "/admin/new", label: "写文章", key: "new" },
   { href: "/admin/comments", label: "评论", key: "comments" },
   { href: "/admin/media", label: "图片", key: "media" },
+  { href: "/admin/links", label: "外链", key: "links" },
   { href: "/admin/audit", label: "日志", key: "audit" },
   { href: "/admin/settings", label: "设置", key: "settings" },
 ];
