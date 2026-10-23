@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import Database from "better-sqlite3";
 import { getDb, ftsAvailable } from "./db";
 import { getSettings } from "./settings";
 import { dateKeyIn } from "./time";
@@ -13,14 +15,68 @@ export type Stat = { label: string; value: string; icon: string };
  *
  * 现在：Umami 的数值由 systemd timer 定时拉取后写回 settings（scripts/sync-umami.mjs），
  * 渲染路径只读本地 SQLite —— 统计服务抖动最多让数字变旧，不再影响可达性。
+ *
+ * ── 评论数改读 Artalk（2026-10-23）────────────────────────────
+ * 此前数的是博客自建的 comments 表，但评论早已迁到 Artalk，
+ * 那张表恒为 0，侧栏永远显示「评论 0」—— 是个失效数字。
+ *
+ * 改为直接只读打开 Artalk 的 SQLite。为什么不用定时同步：
+ *   · 评论低频变化，外层已有 unstable_cache 兜 300 秒，实际查询极少
+ *   · Artalk 用 journal_mode=delete（非 WAL），只读连接不与之争锁
+ *   · 少一个 systemd 单元和一份同步脚本，部署链更简单
+ * 代价是博客对 Artalk 多了一层弱耦合，用下面的兜底隔离：
+ * 文件缺失 / 打不开 / schema 变更一律返回 null，显示「—」，
+ * 而不是假装 0（区分「真的没有评论」与「读不到」）。
  */
+const ARTALK_DB = process.env.ARTALK_DB || "/opt/artalk/data/artalk.db";
+const ARTALK_SITE = process.env.NEXT_PUBLIC_ARTALK_SITE || "flechazo blog";
+
+/** undefined = 未尝试，null = 试过但不可用，对象 = 可用 */
+let _artalk: Database.Database | null | undefined;
+
+function getArtalkDb(): Database.Database | null {
+  if (_artalk !== undefined) return _artalk;
+  try {
+    if (!fs.existsSync(ARTALK_DB)) { _artalk = null; return null; }
+    const db = new Database(ARTALK_DB, { readonly: true, fileMustExist: true });
+    db.pragma("busy_timeout = 2000");
+    _artalk = db;
+    return db;
+  } catch (e) {
+    console.warn("[stats] Artalk 库打不开，评论数显示「—」:", (e as Error).message);
+    _artalk = null;
+    return null;
+  }
+}
+
+/** Artalk 已审核且未删除的评论数；null = 读不到 */
+export function getArtalkCommentCount(): number | null {
+  const db = getArtalkDb();
+  if (!db) return null;
+  try {
+    // Artalk 用软删除（deleted_at）+ 待审标记（is_pending），两者都要排除
+    const row = db.prepare(
+      "SELECT COUNT(*) AS c FROM comments " +
+      "WHERE deleted_at IS NULL AND (is_pending = 0 OR is_pending IS NULL) AND site_name = ?"
+    ).get(ARTALK_SITE) as { c: number } | undefined;
+    return row ? row.c : null;
+  } catch (e) {
+    console.warn("[stats] Artalk 评论查询失败:", (e as Error).message);
+    return null;
+  }
+}
+
 export function getSiteStats(): Stat[] {
   const db = getDb();
   const c = (sql: string) => (db.prepare(sql).get() as { c: number }).c;
 
   const posts = c("SELECT COUNT(*) c FROM posts WHERE type = 'post' AND status = 'published' AND deleted_at IS NULL");
   const shuo = c("SELECT COUNT(*) c FROM posts WHERE type = 'shuoshuo' AND status = 'published' AND deleted_at IS NULL");
-  const comments = c("SELECT COUNT(*) c FROM comments WHERE status = 'approved'");
+  // 评论以 Artalk 为准；读不到时退回博客自建表（历史数据），再不行显示 —
+  const artalkComments = getArtalkCommentCount();
+  const commentsText = artalkComments !== null
+    ? String(artalkComments)
+    : String(c("SELECT COUNT(*) c FROM comments WHERE status = 'approved'"));
 
   const first = db.prepare(
     "SELECT MIN(published_at) m FROM posts WHERE type = 'post' AND status = 'published' AND deleted_at IS NULL"
@@ -40,7 +96,7 @@ export function getSiteStats(): Stat[] {
   return [
     { label: "文章", value: String(posts), icon: "📝" },
     { label: "说说", value: String(shuo), icon: "💬" },
-    { label: "评论", value: String(comments), icon: "🗨" },
+    { label: "评论", value: commentsText, icon: "🗨" },
     { label: "运行", value: days + "天", icon: "⏳" },
     { label: "访问", value: viewsText, icon: "👁" },
   ];
