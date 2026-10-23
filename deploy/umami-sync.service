@@ -8,4 +8,4 @@ User=blog
 Group=blog
 Environment=DATA_DIR=/var/lib/blog
 EnvironmentFile=/etc/blog/umami.env
-ExecStart=/usr/bin/node /opt/blog/scripts/sync-umami.mjs
+ExecStart=/usr/bin/node /opt/blog/current/scripts/sync-umami.mjs
