@@ -117,6 +117,8 @@ const nextConfig: NextConfig = {
       "tests/**",
       "docs/**",
       "out/**",
+      "dist/**",
+      ".next/standalone/**",
       "content/**",
       "deploy/**",
       "scripts/**",

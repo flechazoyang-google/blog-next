@@ -168,6 +168,61 @@ function patchNestedNativeDeps() {
 patchNestedNativeDeps();
 
 /**
+ * 剔除平台无关的构建产物（2026-10-23）。
+ *
+ * 背景：copyRuntimeDeps 会按 package.json 的 dependencies 递归复制整个包，
+ * 于是 @next/swc-win32-x64-msvc（105MB 的 Windows 专用 .node 二进制）也被打进产物。
+ * 它在 Linux 服务器上永远不会被加载 —— 只在 next build（构建期）通过
+ * next/dist/build/swc 解析，运行期 SSR 完全不需要。
+ *
+ * 实测：移除后 healthz / 首页 / 手机侧栏全部正常（见 2026-10-23 验证记录）。
+ * 产物 368MB -> 264MB。同时剔除 @img/sharp-* 里非 linux-x64 的平台包。
+ */
+function pruneForeignPlatformArtifacts() {
+  const nm = path.join(OUT, "node_modules");
+  if (!fs.existsSync(nm)) return;
+  let reclaimed = 0;
+  const dirSize = (p) => {
+    let t = 0;
+    for (const e of fs.readdirSync(p, { withFileTypes: true })) {
+      const q = path.join(p, e.name);
+      try { t += e.isDirectory() ? dirSize(q) : fs.statSync(q).size; } catch { /* skip */ }
+    }
+    return t;
+  };
+  // 服务器是 linux x64；darwin/freebsd/win32/musl/arm 等一律清理
+  const FOREIGN = /-(darwin|freebsd|win32|linuxmusl|linux-arm|linux-ppc64|linux-riscv64|linux-s390x|webcontainers)-/;
+  const scopes = ["@next", "@img"];
+  for (const scope of scopes) {
+    const dir = path.join(nm, scope);
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir)) {
+      if (!FOREIGN.test(entry)) continue;
+      const full = path.join(dir, entry);
+      const size = dirSize(full);
+      forceRemove(full);
+      reclaimed += size;
+      console.log("已剔除平台无关产物：", scope + "/" + entry, "（" + (size / 1048576).toFixed(1) + " MB）");
+    }
+  }
+  // 递归清理 .next 下可能存在的同名副本
+  const walk = (p) => {
+    let ents;
+    try { ents = fs.readdirSync(p, { withFileTypes: true }); } catch { return; }
+    for (const e of ents) {
+      if (!e.isDirectory()) continue;
+      const q = path.join(p, e.name);
+      if (FOREIGN.test(e.name)) { const s2 = dirSize(q); forceRemove(q); reclaimed += s2; continue; }
+      walk(q);
+    }
+  };
+  walk(path.join(OUT, ".next"));
+  if (reclaimed > 0) console.log("平台产物清理合计：", (reclaimed / 1048576).toFixed(1), "MB");
+}
+
+pruneForeignPlatformArtifacts();
+
+/**
  * 打版本戳：产出 dist/.build-info.json，供运行期 healthz 读取。
  * 顺序无所谓（读的是 git 状态而非产物），放最后让日志更清楚。
  */
