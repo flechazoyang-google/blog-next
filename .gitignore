@@ -15,3 +15,16 @@ _*
 tsconfig.tsbuildinfo
 dist.tar.gz
 *.tgz
+
+# 数据库文件一律不进仓库（2026-10-23 公开仓库前收紧）
+# 根目录 blog.db 是开发库，含 users/sessions/recovery_codes 等表结构；
+# 即便当前为空库，也不该出现在版本库里 —— 一旦误放真实数据就是事故。
+blog.db
+blog.db-wal
+blog.db-shm
+*.sqlite
+*.sqlite3
+
+# 草稿不进仓库：尚未发布的内容（含服务器架构、IP 等部署细节）
+# 要发布时再手动放进 content/ 并提交。
+drafts/
