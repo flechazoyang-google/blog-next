@@ -8,6 +8,8 @@ import { getSettings } from "@/lib/settings";
 import { listFriendLinksCached } from "@/lib/cached";
 import { MobileSidebarContent } from "@/components/MobileSidebar";
 import { SiteFooter } from "@/components/SiteFooter";
+import { ThemeScript } from "@/components/ThemeScript";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { SidebarSheetProvider } from "@/components/SidebarSheet";
 
 /**
@@ -67,8 +69,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }));
 
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body>
+        <ThemeScript />
         <ScrollReset />
         {/* 侧栏开合状态提到 provider：顶栏（手机）与左栏（平板）各有一个入口，
             内容在服务端渲染好作为 panel 传入 */}

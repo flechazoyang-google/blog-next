@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SidebarTrigger } from "./SidebarSheet";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
   { href: "/", label: "文章", icon: "📄" },
@@ -48,6 +49,11 @@ export function Sidebar({ active }: { active?: string }) {
       <div className="side-sheet-entry">
         <SidebarTrigger className="side-sheet-btn" />
         <span>侧栏</span>
+      </div>
+
+      {/* 亮/暗主题切换：桌面放在左栏底部，手机在顶栏（见 MobileNav） */}
+      <div className="side-theme">
+        <ThemeToggle />
       </div>
 
       <div className="side-bottom">

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { SidebarTrigger } from "./SidebarSheet";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
   { href: "/", label: "首页", icon: "🏠" },
@@ -84,6 +85,7 @@ export function MobileNav({ links = [] }: { links?: DrawerLink[] }) {
           <span>flechazo</span>
         </Link>
         <div className="mobile-topbar-actions">
+          <ThemeToggle />
           <SidebarTrigger className="mobile-icon-btn mobile-sidebar-btn" />
           <button className="mobile-icon-btn" aria-label="搜索" onClick={() => setSearching(true)}>
             <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden>

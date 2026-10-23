@@ -42,8 +42,39 @@
   --fw-body: 400;
 }
 
+/* 暗色令牌（2026-10-23）：同时支持手动切换与系统偏好。
+   优先级：html[data-theme] 手动选择 > 系统 prefers-color-scheme。
+   首次访问无 data-theme 时跟随系统；点过切换按钮后由 JS 写入 data-theme。 */
+:root[data-theme="dark"] {
+    --bg: #141414;
+    --bg-subtle: #1a1a1a;
+    --bg-warm: #171717;
+    --link: #5fbfa8;
+    --link-hover: #86d8c2;
+    --accent: #e08968;
+    --accent-soft: rgba(224,137,104,.14);
+    --bg-tint: rgba(95,191,168,.06);
+    --cat-1: #5fbfa8;  --cat-1-bg: rgba(95,191,168,.13);
+    --cat-2: #8fa3c9;  --cat-2-bg: rgba(143,163,201,.13);
+    --cat-3: #c99a8c;  --cat-3-bg: rgba(201,154,140,.13);
+    --cat-4: #9d8cc9;  --cat-4-bg: rgba(157,140,201,.13);
+    --cat-5: #c9be8c;  --cat-5-bg: rgba(201,190,140,.13);
+    --cat-6: #8cc4c9;  --cat-6-bg: rgba(140,196,201,.13);
+    --cat-7: #c98cb0;  --cat-7-bg: rgba(201,140,176,.13);
+    --text-p0: rgba(255,255,255,.95);
+    --text-p1: rgba(255,255,255,.85);
+    --text-p2: rgba(255,255,255,.72);
+    --text-p3: rgba(255,255,255,.50);
+    --text-p4: rgba(255,255,255,.38);
+    --border: rgba(255,255,255,.09);
+    --border-strong: rgba(255,255,255,.14);
+    --code-bg: rgba(255,255,255,.06);
+    --card-bg: #1a1a19;
+    --fw-body: 360;   /* 400 - 40 */
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --bg: #141414;
     --bg-subtle: #1a1a1a;
     --bg-warm: #171717;
@@ -1404,6 +1435,55 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 .views-badge svg { opacity: .6; }
 
 
+
+/* ── 亮/暗主题切换按钮 ── */
+.theme-toggle {
+  display: grid;
+  place-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-p3);
+  cursor: pointer;
+  transition: color .16s, background .16s, border-color .16s, transform .16s;
+}
+.theme-toggle:hover {
+  color: var(--link);
+  background: var(--bg-tint);
+  border-color: color-mix(in oklab, var(--link) 22%, transparent);
+}
+.theme-toggle:active { transform: scale(.94); }
+.theme-toggle svg { display: block; }
+/* 首帧未确定主题时的占位，尺寸与图标一致，避免布局跳动 */
+.theme-toggle-ph {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: .12;
+}
+
+/* 手机顶栏里的按钮：与其它图标按钮同尺寸 */
+.mobile-topbar-actions .theme-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+}
+
+/* 桌面左栏底部：与 RSS/设置同一行排版，居中 */
+.side-theme {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+  padding: 0 18px;
+}
+
+/* 暗色下按钮本身不加额外补偿：颜色全部走 token，已随 data-theme 切换 */
+
 /* ── 全站页脚（备案号 / 页脚文字） ── */
 .site-footer {
   border-top: 1px solid var(--border);
@@ -1458,8 +1538,8 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
    所以暗色下所有字重统一 -40，视觉粗细才和浅色一致。
    body 已由 --fw-body token 处理，这里补齐显式声明过字重的规则。
    放在文件末尾，靠源码顺序覆盖前面的同权重声明。 */
-@media (prefers-color-scheme: dark) {
-  /* 550 → 510 */
+/* 暗色字重补偿（铁律 3）：与上面的变量同理，跟随 data-theme 或系统偏好 */
+:root[data-theme="dark"] {  /* 550 → 510 */
   .article-nav-title, .field label, .article-eyebrow .cat-pill { font-weight: 510; }
   /* 560 → 520 */
   .btn { font-weight: 520; }
@@ -1474,5 +1554,23 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
   /* 680 → 640 */
   .article-title { font-weight: 640; }
   /* 700 → 660 */
-  .brand-title, .stat-num { font-weight: 660; }
+  .brand-title, .stat-num { font-weight: 660; }}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {  /* 550 → 510 */
+  .article-nav-title, .field label, .article-eyebrow .cat-pill { font-weight: 510; }
+  /* 560 → 520 */
+  .btn { font-weight: 520; }
+  /* 580 → 540 */
+  .comment-author { font-weight: 540; }
+  /* 600 → 560 */
+  .nav a.active, .prose th, .toc-title, .mobile-drawer-item.active,
+  .nav-item.is-active, .rb-title, .tag-pill .tag-hash { font-weight: 560; }
+  /* 650 → 610 */
+  .page-title, .post-card h2, .prose h1, .prose h2, .prose h3, .prose h4,
+  .comments-title, .mobile-brand { font-weight: 610; }
+  /* 680 → 640 */
+  .article-title { font-weight: 640; }
+  /* 700 → 660 */
+  .brand-title, .stat-num { font-weight: 660; }  }
 }
