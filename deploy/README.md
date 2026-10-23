@@ -179,10 +179,10 @@ docker compose restart
 npm run build && npm run build:dist
 
 # 2) 上传
-scp dist-upload.tar.gz aliyun-ecs:/tmp/blog-dist.tar.gz
+scp dist-upload.tar.gz <your-ssh-host>:/tmp/blog-dist.tar.gz
 
 # 3) 服务器上一条命令（自动备份 / 校验 / 切换 / 探活 / 失败回滚）
-ssh aliyun-ecs
+ssh <your-ssh-host>
 /opt/blog/deploy.sh /tmp/blog-dist.tar.gz
 ```
 
