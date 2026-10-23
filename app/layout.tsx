@@ -7,6 +7,7 @@ import { PwaRegister } from "@/components/PwaRegister";
 import { getSettings } from "@/lib/settings";
 import { listFriendLinksCached } from "@/lib/cached";
 import { MobileSidebarContent } from "@/components/MobileSidebar";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SidebarSheetProvider } from "@/components/SidebarSheet";
 
 /**
@@ -74,6 +75,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <SidebarSheetProvider panel={<MobileSidebarContent />}>
           <MobileNav links={drawerLinks} />
           {children}
+          {/* 全站页脚：备案号与页脚文字此前只有后台能填、前台没渲染 */}
+          <SiteFooter />
         </SidebarSheetProvider>
         <Analytics />
         <PwaRegister />

@@ -1403,6 +1403,46 @@ dialog.lightbox img { max-width: 96vw; max-height: 96vh; border-radius: 8px; }
 }
 .views-badge svg { opacity: .6; }
 
+
+/* ── 全站页脚（备案号 / 页脚文字） ── */
+.site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-warm);
+}
+.site-footer-inner {
+  max-width: calc(var(--w-side) + var(--w-main) + var(--w-toc) + var(--gap-col) * 2 + 64px);
+  margin: 0 auto;
+  padding: 26px 32px 34px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.site-footer-text {
+  font-size: .78rem;
+  color: var(--text-p4);
+  line-height: 1.7;
+}
+.site-footer-icp {
+  font-size: .78rem;
+  color: var(--text-p4);
+  line-height: 1.7;
+  letter-spacing: .01em;
+}
+.site-footer-icp a {
+  color: var(--text-p3);
+  transition: color .16s;
+}
+.site-footer-icp a:hover { color: var(--link); }
+
+/* 手机端：收紧内边距；底部留出安全区（PWA / 手势条） */
+@media (max-width: 820px) {
+  .site-footer-inner {
+    padding: 22px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ── 无障碍降级：尊重系统「减弱动态效果」 ── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
