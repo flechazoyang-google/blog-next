@@ -170,24 +170,46 @@ docker compose restart
 | 改代码不生效 | 是否忘了 `systemctl restart blog` |
 | 日志太多 | `journalctl --vacuum-size=100M` |
 
-### 重新部署流程
+### 重新部署流程（2026-10-23 起：一条命令）
+
+布局是 `releases/<戳>/` + `current` 软链，systemd 的 `WorkingDirectory=/opt/blog/current`。
 
 ```bash
-# 本地构建
-npm run build && node scripts/package-standalone.mjs
+# 1) 本地构建 + 打包
+npm run build && npm run build:dist
 
-# 上传 dist 到服务器后
-systemctl stop blog
-rm -rf /opt/blog/app /opt/blog/.next /opt/blog/node_modules /opt/blog/public /opt/blog/scripts /opt/blog/package.json
-cp -a dist/. /opt/blog/
-# ⚠️ 必须重新放 Linux 版原生模块，否则报 invalid ELF header
-NEW=/root/blog-stage/build-native/node_modules/better-sqlite3/build/Release/better_sqlite3.node
-for d in /opt/blog/node_modules/better-sqlite3 /opt/blog/.next/node_modules/better-sqlite3-*; do
-  [ -d "$d" ] && { mkdir -p "$d/build/Release"; cp "$NEW" "$d/build/Release/better_sqlite3.node"; }
-done
-cd /opt/blog && npm install --no-save bcryptjs@2.4.3 gray-matter@4.0.3
-systemctl start blog
+# 2) 上传
+scp dist-upload.tar.gz aliyun-ecs:/tmp/blog-dist.tar.gz
+
+# 3) 服务器上一条命令（自动备份 / 校验 / 切换 / 探活 / 失败回滚）
+ssh aliyun-ecs
+/opt/blog/deploy.sh /tmp/blog-dist.tar.gz
 ```
+
+其它子命令：
+
+```bash
+/opt/blog/deploy.sh --list        # 现有版本 + 当前指向
+/opt/blog/deploy.sh --rollback    # 回滚到上一版（等健康再报成功）
+```
+
+**脚本会自己处理的事**（不再需要手工）：
+
+| 步骤 | 说明 |
+|---|---|
+| 前置校验 | `WorkingDirectory` 不是 `/opt/blog/current` 就**拒绝部署**（防假成功） |
+| 备份 | 调 `blog-backup`，失败即中止 |
+| 原生模块 | 从 `/opt/blog/shared/native/better_sqlite3.node` 拷入，不再依赖 `/root/blog-stage` |
+| 自检 | 部署前 `require('better-sqlite3')` 试加载，避免起来才 500 |
+| 切换 | `ln -sfn` 原子切换 |
+| 探活 | 20s 内等 healthz；失败自动切回上一版并重启 |
+| 清理 | 保留最近 3 个 release，不动当前版 |
+
+> ⚠️ **旧的「手工 rm -rf + cp -a」流程已废弃** —— 它没有原子性，中途失败会半新半旧，
+> 而且要人去记原生模块那两步。
+>
+> ⚠️ **不要再把 `/opt/blog` 当扁平目录用**。它现在是「软链 + releases + shared」的容器，
+> 直接往里 `cp` 文件不会生效（服务读的是 `current` 指向的 release）。
 
 ---
 
