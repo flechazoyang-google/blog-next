@@ -10,7 +10,11 @@ Type=simple
 # root 会把提权半径放大到整机。改为专用用户（见 deploy/README 的安装步骤）。
 User=blog
 Group=blog
-WorkingDirectory=/opt/blog
+# 必须指向 current 软链（不是 /opt/blog 本体）。
+# 2026-10-23 之前写的是 /opt/blog，与 scripts/deploy.sh 的软链式部署
+# 完全脱节 —— 脚本建 releases/<戳> 并切 current，但服务始终读 /opt/blog 扁平文件，
+# 于是部署「假装成功」。deploy.sh 现在会前置校验这项，不一致就拒绝部署。
+WorkingDirectory=/opt/blog/current
 Environment=NODE_ENV=production
 Environment=PORT=8090
 Environment=HOSTNAME=127.0.0.1
