@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SidebarTrigger } from "./SidebarSheet";
 
 const NAV = [
   { href: "/", label: "文章", icon: "📄" },
@@ -39,6 +40,15 @@ export function Sidebar({ active }: { active?: string }) {
           );
         })}
       </nav>
+
+
+      {/* 平板（821~1200px）：右栏已隐藏但顶栏还没出现，
+          这里补一个侧栏入口，避免这一区间完全看不到统计/外链/标签。
+          ≤820px 时左栏整体隐藏，此按钮自然不可见。 */}
+      <div className="side-sheet-entry">
+        <SidebarTrigger className="side-sheet-btn" />
+        <span>侧栏</span>
+      </div>
 
       <div className="side-bottom">
         <a href="/rss.xml" title="RSS">RSS</a>

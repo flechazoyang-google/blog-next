@@ -6,6 +6,8 @@ import { Analytics } from "@/components/Analytics";
 import { PwaRegister } from "@/components/PwaRegister";
 import { getSettings } from "@/lib/settings";
 import { listFriendLinksCached } from "@/lib/cached";
+import { MobileSidebarContent } from "@/components/MobileSidebar";
+import { SidebarSheetProvider } from "@/components/SidebarSheet";
 
 /**
  * C4：站名/描述此前硬编码在这里，改一个字要重新构建。
@@ -67,8 +69,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="zh-CN">
       <body>
         <ScrollReset />
-        <MobileNav links={drawerLinks} />
-        {children}
+        {/* 侧栏开合状态提到 provider：顶栏（手机）与左栏（平板）各有一个入口，
+            内容在服务端渲染好作为 panel 传入 */}
+        <SidebarSheetProvider panel={<MobileSidebarContent />}>
+          <MobileNav links={drawerLinks} />
+          {children}
+        </SidebarSheetProvider>
         <Analytics />
         <PwaRegister />
       </body>

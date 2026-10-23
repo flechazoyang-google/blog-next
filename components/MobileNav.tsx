@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { SidebarTrigger } from "./SidebarSheet";
 
 const NAV = [
   { href: "/", label: "首页", icon: "🏠" },
@@ -15,7 +16,9 @@ const NAV = [
  * 手机端顶部栏：左侧 Logo + 站名，右侧一个汉堡按钮。
  * 导航全部收进左侧抽屉，避免顶部横向排列拥挤。
  */
-export function MobileNav() {
+type DrawerLink = { id: number; name: string; url: string; desc: string; kind: string };
+
+export function MobileNav({ links = [] }: { links?: DrawerLink[] }) {
   const [open, setOpen] = useState(false);
   const [searching, setSearching] = useState(false);
   const pathname = usePathname();
@@ -25,10 +28,18 @@ export function MobileNav() {
   // 切换路由时自动关闭
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // 打开时锁定背景滚动
+  // 打开时锁定背景滚动（侧栏面板由 SidebarSheetProvider 自己管）
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
+  // 左抽屉：Esc 关闭（与右侧侧栏一致）
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
   return (
@@ -73,6 +84,7 @@ export function MobileNav() {
           <span>flechazo</span>
         </Link>
         <div className="mobile-topbar-actions">
+          <SidebarTrigger className="mobile-icon-btn mobile-sidebar-btn" />
           <button className="mobile-icon-btn" aria-label="搜索" onClick={() => setSearching(true)}>
             <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden>
               <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="2" />
@@ -108,6 +120,25 @@ export function MobileNav() {
                 {n.label}
               </Link>
             ))}
+            {links.length > 0 ? (
+              <div className="mobile-drawer-links">
+                <div className="mobile-drawer-links-title">聚合 / 友链</div>
+                {links.map((l) => (
+                  <a
+                    key={l.id}
+                    className="mobile-drawer-link"
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={l.desc || l.name}
+                  >
+                    <span className="mi" aria-hidden>{l.kind === "hub" ? "🚇" : "🔗"}</span>
+                    <span className="mobile-drawer-link-name">{l.name}</span>
+                    <span className="mobile-drawer-link-out" aria-hidden>↗</span>
+                  </a>
+                ))}
+              </div>
+            ) : null}
             <div className="mobile-drawer-foot">
               <a href="/rss.xml">RSS</a>
               <a href="/admin">管理</a>
@@ -115,6 +146,7 @@ export function MobileNav() {
           </nav>
         </div>
       ) : null}
+
     </>
   );
 }
